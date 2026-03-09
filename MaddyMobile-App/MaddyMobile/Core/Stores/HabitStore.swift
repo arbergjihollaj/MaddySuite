@@ -1,0 +1,163 @@
+import Foundation
+
+// =====================================================
+// MARK: - HabitStore
+// [TAG: MOBILE_HABIT_STORE]
+// =====================================================
+
+@MainActor
+final class HabitStore: ObservableObject {
+    struct CloudSnapshot: Codable {
+        var habits: [Habit]
+        var modifiedAt: Date
+    }
+
+    @Published private(set) var habits: [Habit] {
+        didSet { persist() }
+    }
+
+    var onHabitCompleted: ((Habit) -> Void)?
+    var onDataChanged: (() -> Void)?
+
+    private struct Persisted: Codable {
+        var habits: [Habit]
+        var lastModifiedAt: Date?
+    }
+
+    private let storage: LocalJSONStorage
+    private let fileName = "habits.json"
+    private(set) var lastModifiedAt: Date
+    private var isApplyingCloudSnapshot = false
+
+    init(storage: LocalJSONStorage = .shared) {
+        self.storage = storage
+
+        if let loaded = storage.loadIfPresent(Persisted.self, from: fileName) {
+            habits = loaded.habits
+            lastModifiedAt = loaded.lastModifiedAt ?? Self.deriveModifiedAt(from: loaded.habits)
+        } else {
+            let legacy = storage.load([Habit].self, from: fileName, fallback: [])
+            habits = legacy
+            lastModifiedAt = Self.deriveModifiedAt(from: legacy)
+        }
+
+        persist()
+    }
+
+    var todayProgressText: String {
+        "\(completedTodayCount)/\(habits.count)"
+    }
+
+    var completedTodayCount: Int {
+        let key = Self.dayKey(Date())
+        return habits.filter { ($0.history[key] ?? 0) >= $0.targetValue }.count
+    }
+
+    func upsert(_ habit: Habit) {
+        if let index = habits.firstIndex(where: { $0.id == habit.id }) {
+            habits[index] = habit
+        } else {
+            habits.append(habit)
+        }
+        touchLocalMutation()
+    }
+
+    func delete(id: UUID) {
+        habits.removeAll { $0.id == id }
+        touchLocalMutation()
+    }
+
+    func markCompleted(id: UUID, date: Date = Date()) {
+        guard let index = habits.firstIndex(where: { $0.id == id }) else { return }
+        var habit = habits[index]
+        let key = Self.dayKey(date)
+
+        let alreadyComplete = (habit.history[key] ?? 0) >= habit.targetValue
+        if alreadyComplete {
+            return
+        }
+
+        habit.history[key] = habit.targetValue
+        updateStreak(for: &habit, on: key)
+        habits[index] = habit
+
+        touchLocalMutation()
+        onHabitCompleted?(habit)
+    }
+
+    func totalCompletions(forYear year: Int) -> [Date: Int] {
+        var map: [Date: Int] = [:]
+        let calendar = Calendar.current
+
+        for habit in habits {
+            for (key, value) in habit.history {
+                guard let date = Self.dayDate(key), calendar.component(.year, from: date) == year else { continue }
+                map[date, default: 0] += value
+            }
+        }
+
+        return map
+    }
+
+    func cloudSnapshot() -> CloudSnapshot {
+        CloudSnapshot(habits: habits, modifiedAt: lastModifiedAt)
+    }
+
+    func applyCloudSnapshot(_ snapshot: CloudSnapshot) {
+        guard snapshot.modifiedAt > lastModifiedAt else { return }
+
+        isApplyingCloudSnapshot = true
+        habits = snapshot.habits
+        lastModifiedAt = snapshot.modifiedAt
+        isApplyingCloudSnapshot = false
+        persist()
+    }
+
+    private func updateStreak(for habit: inout Habit, on key: String) {
+        if let last = habit.lastCompletedDateKey,
+           let previousDate = Self.dayDate(last),
+           let currentDate = Self.dayDate(key) {
+            let diff = Calendar.current.dateComponents([.day], from: previousDate, to: currentDate).day ?? 0
+            if diff == 1 {
+                habit.streak += 1
+            } else if diff > 1 {
+                habit.streak = 1
+            }
+        } else {
+            habit.streak = max(1, habit.streak)
+        }
+        habit.lastCompletedDateKey = key
+    }
+
+    private func touchLocalMutation() {
+        guard isApplyingCloudSnapshot == false else { return }
+        lastModifiedAt = Date()
+        persist()
+        onDataChanged?()
+    }
+
+    private func persist() {
+        storage.save(Persisted(habits: habits, lastModifiedAt: lastModifiedAt), to: fileName)
+    }
+
+    private static func deriveModifiedAt(from habits: [Habit]) -> Date {
+        habits
+            .flatMap { $0.history.keys }
+            .compactMap(Self.dayDate)
+            .max() ?? .distantPast
+    }
+
+    static func dayKey(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    static func dayDate(_ key: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: key)
+    }
+}

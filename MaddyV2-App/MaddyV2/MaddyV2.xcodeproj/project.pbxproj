@@ -1,0 +1,525 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		18707DDE2F574F86006ACFA4 /* MaddyV2App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18707DDD2F574F86006ACFA4 /* MaddyV2App.swift */; };
+		18707DEE2F574FE7006ACFA4 /* AppRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18707DED2F574FE3006ACFA4 /* AppRoute.swift */; };
+		18707DF02F574FFA006ACFA4 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18707DEF2F574FF6006ACFA4 /* AppState.swift */; };
+		18707DF22F57500C006ACFA4 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18707DF12F575009006ACFA4 /* RootView.swift */; };
+		18707DF62F57520F006ACFA4 /* SerialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18707DF32F57501A006ACFA4 /* SerialService.swift */; };
+		18707DF72F575216006ACFA4 /* MusicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18707DF42F57502A006ACFA4 /* MusicService.swift */; };
+		A10000000000000000000012 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18707DF52F57504E006ACFA4 /* HomeView.swift */; };
+		A10000000000000000000013 /* Focus/FocusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* Focus/FocusView.swift */; };
+		A10000000000000000000014 /* Tasks/TasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* Tasks/TasksView.swift */; };
+		A10000000000000000000015 /* Habits/HabitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* Habits/HabitsView.swift */; };
+		A10000000000000000000016 /* Music/MusicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* Music/MusicView.swift */; };
+		A10000000000000000000017 /* Settings/SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000006 /* Settings/SettingsView.swift */; };
+		A10000000000000000000018 /* Shared/SharedUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000007 /* Shared/SharedUI.swift */; };
+		A10000000000000000000019 /* Services/GamificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000008 /* Services/GamificationService.swift */; };
+		A1000000000000000000001A /* Stats/StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000009 /* Stats/StatsView.swift */; };
+		A1000000000000000000001B /* Stats/StatsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000A /* Stats/StatsViewModel.swift */; };
+		A1000000000000000000001C /* Gamification/GamificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000B /* Gamification/GamificationView.swift */; };
+		A1000000000000000000001D /* Gamification/GamificationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000C /* Gamification/GamificationViewModel.swift */; };
+		A1000000000000000000001E /* UI/Components/RadarHexChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000D /* UI/Components/RadarHexChart.swift */; };
+		C30000000000000000000001 /* UI/Components/TitleBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000000000000000000002 /* UI/Components/TitleBarView.swift */; };
+		B20000000000000000000001 /* Services/AI/AIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000011 /* Services/AI/AIModels.swift */; };
+		B20000000000000000000002 /* Services/AI/AIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000012 /* Services/AI/AIError.swift */; };
+		B20000000000000000000003 /* Services/AI/AIStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000013 /* Services/AI/AIStorage.swift */; };
+		B20000000000000000000004 /* Services/AI/LocalLLMClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000014 /* Services/AI/LocalLLMClient.swift */; };
+		B20000000000000000000005 /* Services/AI/CloudLLMClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000015 /* Services/AI/CloudLLMClient.swift */; };
+		B20000000000000000000006 /* Services/AI/AIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000016 /* Services/AI/AIService.swift */; };
+		B20000000000000000000007 /* Features/AI/AIView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000017 /* Features/AI/AIView.swift */; };
+		B20000000000000000000008 /* Features/AI/StudyCoachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000018 /* Features/AI/StudyCoachView.swift */; };
+		B20000000000000000000009 /* Features/AI/AIChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000019 /* Features/AI/AIChatView.swift */; };
+		B2000000000000000000000A /* Services/AI/AIPromptTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000001A /* Services/AI/AIPromptTemplates.swift */; };
+		B2000000000000000000000B /* Features/AI/AIToolsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000001B /* Features/AI/AIToolsPanel.swift */; };
+		B2000000000000000000000C /* Features/Settings/AISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000001C /* Features/Settings/AISettingsView.swift */; };
+		B2000000000000000000000D /* Services/AI/AIMemoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000001D /* Services/AI/AIMemoryStore.swift */; };
+		B2000000000000000000000E /* Services/AI/AIRetrieval.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000001E /* Services/AI/AIRetrieval.swift */; };
+		D40000000000000000000001 /* Features/Tasks/TaskEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000011 /* Features/Tasks/TaskEditorSheet.swift */; };
+		D40000000000000000000002 /* Features/AI/AIQuickBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000012 /* Features/AI/AIQuickBarView.swift */; };
+		D40000000000000000000003 /* Services/AI/AICommandRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000013 /* Services/AI/AICommandRouter.swift */; };
+		E50000000000000000000001 /* Services/StatisticsExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50000000000000000000011 /* Services/StatisticsExportService.swift */; };
+		F61000000000000000000001 /* Services/FileShelfStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61000000000000000000011 /* Services/FileShelfStore.swift */; };
+		F61000000000000000000002 /* Features/FileShelf/FileShelfPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61000000000000000000012 /* Features/FileShelf/FileShelfPanelView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		18707DDA2F574F85006ACFA4 /* MaddyV2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MaddyV2.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		18707DDD2F574F86006ACFA4 /* MaddyV2App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaddyV2App.swift; sourceTree = "<group>"; };
+		18707DED2F574FE3006ACFA4 /* AppRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRoute.swift; sourceTree = "<group>"; };
+		18707DEF2F574FF6006ACFA4 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		18707DF12F575009006ACFA4 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		18707DF32F57501A006ACFA4 /* SerialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialService.swift; sourceTree = "<group>"; };
+		18707DF42F57502A006ACFA4 /* MusicService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicService.swift; sourceTree = "<group>"; };
+		18707DF52F57504E006ACFA4 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		A10000000000000000000002 /* Focus/FocusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Focus/FocusView.swift; sourceTree = "<group>"; };
+		A10000000000000000000003 /* Tasks/TasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tasks/TasksView.swift; sourceTree = "<group>"; };
+		A10000000000000000000004 /* Habits/HabitsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Habits/HabitsView.swift; sourceTree = "<group>"; };
+		A10000000000000000000005 /* Music/MusicView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Music/MusicView.swift; sourceTree = "<group>"; };
+		A10000000000000000000006 /* Settings/SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings/SettingsView.swift; sourceTree = "<group>"; };
+		A10000000000000000000007 /* Shared/SharedUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/SharedUI.swift; sourceTree = "<group>"; };
+		A10000000000000000000008 /* Services/GamificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamificationService.swift; sourceTree = "<group>"; };
+		A10000000000000000000009 /* Stats/StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stats/StatsView.swift; sourceTree = "<group>"; };
+		A1000000000000000000000A /* Stats/StatsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stats/StatsViewModel.swift; sourceTree = "<group>"; };
+		A1000000000000000000000B /* Gamification/GamificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Gamification/GamificationView.swift; sourceTree = "<group>"; };
+		A1000000000000000000000C /* Gamification/GamificationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Gamification/GamificationViewModel.swift; sourceTree = "<group>"; };
+		A1000000000000000000000D /* UI/Components/RadarHexChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../UI/Components/RadarHexChart.swift; sourceTree = "<group>"; };
+		C30000000000000000000002 /* UI/Components/TitleBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../UI/Components/TitleBarView.swift; sourceTree = "<group>"; };
+		B20000000000000000000011 /* Services/AI/AIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/AIModels.swift; sourceTree = "<group>"; };
+		B20000000000000000000012 /* Services/AI/AIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/AIError.swift; sourceTree = "<group>"; };
+		B20000000000000000000013 /* Services/AI/AIStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/AIStorage.swift; sourceTree = "<group>"; };
+		B20000000000000000000014 /* Services/AI/LocalLLMClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/LocalLLMClient.swift; sourceTree = "<group>"; };
+		B20000000000000000000015 /* Services/AI/CloudLLMClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/CloudLLMClient.swift; sourceTree = "<group>"; };
+		B20000000000000000000016 /* Services/AI/AIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/AIService.swift; sourceTree = "<group>"; };
+		B20000000000000000000017 /* Features/AI/AIView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/AIView.swift; sourceTree = "<group>"; };
+		B20000000000000000000018 /* Features/AI/StudyCoachView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/StudyCoachView.swift; sourceTree = "<group>"; };
+		B20000000000000000000019 /* Features/AI/AIChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/AIChatView.swift; sourceTree = "<group>"; };
+		B2000000000000000000001A /* Services/AI/AIPromptTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Services/AI/AIPromptTemplates.swift; sourceTree = "<group>"; };
+		B2000000000000000000001B /* Features/AI/AIToolsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/AIToolsPanel.swift; sourceTree = "<group>"; };
+		B2000000000000000000001C /* Features/Settings/AISettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings/AISettingsView.swift; sourceTree = "<group>"; };
+		B2000000000000000000001D /* Services/AI/AIMemoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/AIMemoryStore.swift; sourceTree = "<group>"; };
+		B2000000000000000000001E /* Services/AI/AIRetrieval.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/AIRetrieval.swift; sourceTree = "<group>"; };
+		D40000000000000000000011 /* Features/Tasks/TaskEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tasks/TaskEditorSheet.swift; sourceTree = "<group>"; };
+		D40000000000000000000012 /* Features/AI/AIQuickBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/AIQuickBarView.swift; sourceTree = "<group>"; };
+		D40000000000000000000013 /* Services/AI/AICommandRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI/AICommandRouter.swift; sourceTree = "<group>"; };
+		E50000000000000000000011 /* Services/StatisticsExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsExportService.swift; sourceTree = "<group>"; };
+		F61000000000000000000011 /* Services/FileShelfStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileShelfStore.swift; sourceTree = "<group>"; };
+		F61000000000000000000012 /* Features/FileShelf/FileShelfPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileShelf/FileShelfPanelView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		18707DDC2F574F85006ACFA4 /* MaddyV2 */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MaddyV2;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		18707DD72F574F85006ACFA4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		18707DD12F574F85006ACFA4 = {
+			isa = PBXGroup;
+			children = (
+				18707DE82F574FA4006ACFA4 /* App */,
+				18707DE92F574FAD006ACFA4 /* Services */,
+				18707DEC2F574FBE006ACFA4 /* Features */,
+				18707DDC2F574F85006ACFA4 /* MaddyV2 */,
+				18707DDB2F574F85006ACFA4 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		18707DDB2F574F85006ACFA4 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				18707DDA2F574F85006ACFA4 /* MaddyV2.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		18707DE82F574FA4006ACFA4 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				18707DF12F575009006ACFA4 /* RootView.swift */,
+				18707DEF2F574FF6006ACFA4 /* AppState.swift */,
+				18707DED2F574FE3006ACFA4 /* AppRoute.swift */,
+				18707DDD2F574F86006ACFA4 /* MaddyV2App.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		18707DE92F574FAD006ACFA4 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000016 /* Services/AI/AIService.swift */,
+				B20000000000000000000014 /* Services/AI/LocalLLMClient.swift */,
+				B20000000000000000000015 /* Services/AI/CloudLLMClient.swift */,
+				B20000000000000000000011 /* Services/AI/AIModels.swift */,
+				B20000000000000000000012 /* Services/AI/AIError.swift */,
+				B20000000000000000000013 /* Services/AI/AIStorage.swift */,
+				B2000000000000000000001A /* Services/AI/AIPromptTemplates.swift */,
+				B2000000000000000000001D /* Services/AI/AIMemoryStore.swift */,
+				B2000000000000000000001E /* Services/AI/AIRetrieval.swift */,
+				D40000000000000000000013 /* Services/AI/AICommandRouter.swift */,
+				A10000000000000000000008 /* Services/GamificationService.swift */,
+				E50000000000000000000011 /* Services/StatisticsExportService.swift */,
+				F61000000000000000000011 /* Services/FileShelfStore.swift */,
+				18707DF42F57502A006ACFA4 /* MusicService.swift */,
+				18707DF32F57501A006ACFA4 /* SerialService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		18707DEC2F574FBE006ACFA4 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				18707DF52F57504E006ACFA4 /* HomeView.swift */,
+				B20000000000000000000017 /* Features/AI/AIView.swift */,
+				B20000000000000000000018 /* Features/AI/StudyCoachView.swift */,
+				B20000000000000000000019 /* Features/AI/AIChatView.swift */,
+				B2000000000000000000001B /* Features/AI/AIToolsPanel.swift */,
+				D40000000000000000000012 /* Features/AI/AIQuickBarView.swift */,
+				A10000000000000000000002 /* Focus/FocusView.swift */,
+				A1000000000000000000000B /* Gamification/GamificationView.swift */,
+				A1000000000000000000000C /* Gamification/GamificationViewModel.swift */,
+				A10000000000000000000009 /* Stats/StatsView.swift */,
+				A1000000000000000000000A /* Stats/StatsViewModel.swift */,
+				A10000000000000000000003 /* Tasks/TasksView.swift */,
+				D40000000000000000000011 /* Features/Tasks/TaskEditorSheet.swift */,
+				A10000000000000000000004 /* Habits/HabitsView.swift */,
+				A10000000000000000000005 /* Music/MusicView.swift */,
+				A10000000000000000000006 /* Settings/SettingsView.swift */,
+				B2000000000000000000001C /* Features/Settings/AISettingsView.swift */,
+				F61000000000000000000012 /* Features/FileShelf/FileShelfPanelView.swift */,
+				A10000000000000000000007 /* Shared/SharedUI.swift */,
+				A1000000000000000000000D /* UI/Components/RadarHexChart.swift */,
+				C30000000000000000000002 /* UI/Components/TitleBarView.swift */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		18707DD92F574F85006ACFA4 /* MaddyV2 */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 18707DE52F574F87006ACFA4 /* Build configuration list for PBXNativeTarget "MaddyV2" */;
+			buildPhases = (
+				18707DD62F574F85006ACFA4 /* Sources */,
+				18707DD72F574F85006ACFA4 /* Frameworks */,
+				18707DD82F574F85006ACFA4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				18707DDC2F574F85006ACFA4 /* MaddyV2 */,
+			);
+			name = MaddyV2;
+			packageProductDependencies = (
+			);
+			productName = MaddyV2;
+			productReference = 18707DDA2F574F85006ACFA4 /* MaddyV2.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		18707DD22F574F85006ACFA4 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2630;
+				LastUpgradeCheck = 2630;
+				TargetAttributes = {
+					18707DD92F574F85006ACFA4 = {
+						CreatedOnToolsVersion = 26.3;
+					};
+				};
+			};
+			buildConfigurationList = 18707DD52F574F85006ACFA4 /* Build configuration list for PBXProject "MaddyV2" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 18707DD12F574F85006ACFA4;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 18707DDB2F574F85006ACFA4 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				18707DD92F574F85006ACFA4 /* MaddyV2 */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		18707DD82F574F85006ACFA4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		18707DD62F574F85006ACFA4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				18707DDE2F574F86006ACFA4 /* MaddyV2App.swift in Sources */,
+				A10000000000000000000012 /* HomeView.swift in Sources */,
+				A10000000000000000000013 /* Focus/FocusView.swift in Sources */,
+				A10000000000000000000014 /* Tasks/TasksView.swift in Sources */,
+				A10000000000000000000015 /* Habits/HabitsView.swift in Sources */,
+				A10000000000000000000016 /* Music/MusicView.swift in Sources */,
+				A10000000000000000000017 /* Settings/SettingsView.swift in Sources */,
+				A10000000000000000000018 /* Shared/SharedUI.swift in Sources */,
+				A10000000000000000000019 /* Services/GamificationService.swift in Sources */,
+				A1000000000000000000001A /* Stats/StatsView.swift in Sources */,
+				A1000000000000000000001B /* Stats/StatsViewModel.swift in Sources */,
+				A1000000000000000000001C /* Gamification/GamificationView.swift in Sources */,
+				A1000000000000000000001D /* Gamification/GamificationViewModel.swift in Sources */,
+				A1000000000000000000001E /* UI/Components/RadarHexChart.swift in Sources */,
+				C30000000000000000000001 /* UI/Components/TitleBarView.swift in Sources */,
+				B20000000000000000000007 /* Features/AI/AIView.swift in Sources */,
+				B20000000000000000000008 /* Features/AI/StudyCoachView.swift in Sources */,
+				B20000000000000000000009 /* Features/AI/AIChatView.swift in Sources */,
+				B2000000000000000000000A /* Services/AI/AIPromptTemplates.swift in Sources */,
+				B2000000000000000000000D /* Services/AI/AIMemoryStore.swift in Sources */,
+				B2000000000000000000000E /* Services/AI/AIRetrieval.swift in Sources */,
+				D40000000000000000000003 /* Services/AI/AICommandRouter.swift in Sources */,
+				B2000000000000000000000B /* Features/AI/AIToolsPanel.swift in Sources */,
+				D40000000000000000000002 /* Features/AI/AIQuickBarView.swift in Sources */,
+				B2000000000000000000000C /* Features/Settings/AISettingsView.swift in Sources */,
+				B20000000000000000000006 /* Services/AI/AIService.swift in Sources */,
+				B20000000000000000000004 /* Services/AI/LocalLLMClient.swift in Sources */,
+				B20000000000000000000005 /* Services/AI/CloudLLMClient.swift in Sources */,
+				B20000000000000000000001 /* Services/AI/AIModels.swift in Sources */,
+				B20000000000000000000002 /* Services/AI/AIError.swift in Sources */,
+				B20000000000000000000003 /* Services/AI/AIStorage.swift in Sources */,
+				18707DF72F575216006ACFA4 /* MusicService.swift in Sources */,
+				18707DEE2F574FE7006ACFA4 /* AppRoute.swift in Sources */,
+				18707DF62F57520F006ACFA4 /* SerialService.swift in Sources */,
+				18707DF02F574FFA006ACFA4 /* AppState.swift in Sources */,
+				18707DF22F57500C006ACFA4 /* RootView.swift in Sources */,
+				D40000000000000000000001 /* Features/Tasks/TaskEditorSheet.swift in Sources */,
+				E50000000000000000000001 /* Services/StatisticsExportService.swift in Sources */,
+				F61000000000000000000001 /* Services/FileShelfStore.swift in Sources */,
+				F61000000000000000000002 /* Features/FileShelf/FileShelfPanelView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		18707DE32F574F87006ACFA4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = WDJ29FRHHF;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		18707DE42F574F87006ACFA4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = WDJ29FRHHF;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		18707DE62F574F87006ACFA4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WDJ29FRHHF;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "MaddyV2 needs access to read and control Apple Music.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.arber.MaddyV2;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		18707DE72F574F87006ACFA4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WDJ29FRHHF;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "MaddyV2 needs access to read and control Apple Music.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.arber.MaddyV2;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		18707DD52F574F85006ACFA4 /* Build configuration list for PBXProject "MaddyV2" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				18707DE32F574F87006ACFA4 /* Debug */,
+				18707DE42F574F87006ACFA4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		18707DE52F574F87006ACFA4 /* Build configuration list for PBXNativeTarget "MaddyV2" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				18707DE62F574F87006ACFA4 /* Debug */,
+				18707DE72F574F87006ACFA4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 18707DD22F574F85006ACFA4 /* Project object */;
+}

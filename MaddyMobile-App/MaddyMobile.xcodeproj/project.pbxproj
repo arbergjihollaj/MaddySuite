@@ -1,0 +1,589 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		059257FA9FAC670D2933A839 /* RadarChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 785E021B71237938F5835F16 /* RadarChartView.swift */; };
+		129594514013B66563441F72 /* SymbolPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E28A17C0AE454229D471559 /* SymbolPicker.swift */; };
+		1F196E44479C979C87E9A12A /* GamificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C736F1D0AD76F35752B9C48 /* GamificationView.swift */; };
+		3AE64B6FCC7E580EDD1E9383 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0232EB28D93CA45FBC3ADD60 /* RootTabView.swift */; };
+		3F4D670C36A8A02549156B7E /* GamificationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE5731B6D13F87A39C94A35 /* GamificationStore.swift */; };
+		50DC882F95A16FB4E8AD98DD /* GlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50D73AB689D17AA54C341130 /* GlassCard.swift */; };
+		553E1C8577AC33ED5348A11F /* HabitEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2B3AAE3F096E6D507194218 /* HabitEditorSheet.swift */; };
+		572E9802CD78F364FB0AAD4B /* LocalJSONStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2760B0D041BC8015E8001F9A /* LocalJSONStorage.swift */; };
+		651A45491F07F99DB5B2C569 /* TasksStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A711A96A166BB9DED387D9C /* TasksStore.swift */; };
+		6905872AD21B7CBEC88324CA /* TaskItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263461F0A7D7893F87F14E45 /* TaskItem.swift */; };
+		6D4978EC241B536DC547DAEB /* HabitStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4B307ED415C902B9B37F1B /* HabitStore.swift */; };
+		7CCED634E5C16454920626DA /* YearHeatmapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2EC572F62329AC4F877E7E /* YearHeatmapView.swift */; };
+		844D8A77A17D6CDBF86D4DD5 /* FocusSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC4D57F808CFE9DE3F2C713 /* FocusSession.swift */; };
+		84B9A5DA43788272D90D5A43 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4395A4176944AD07982E015C /* Foundation.framework */; };
+		87D7D854F6B452066C461C87 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8CEC1622C7DE47191569A5E0 /* Assets.xcassets */; };
+		8966158A0D30B77720AFF7AC /* Habit.swift in Sources */ = {isa = PBXBuildFile; fileRef = E76ECF4835D8CD248019A92A /* Habit.swift */; };
+		9CA087509B43837539181073 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A9E5DFBF0AA1917446A57F7 /* StatsView.swift */; };
+		9FE8B1B41EC5D7846EC709ED /* HabitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D89812BB18CF7B0DED578F6C /* HabitsView.swift */; };
+		A3F00791A76A54D59BDD7B20 /* RingTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A501E0E134F782EFCD17E1F8 /* RingTimerView.swift */; };
+		AA3DCF3D545BE6FAE9A7BB34 /* FocusStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95E68CD49FE9A081010F6C02 /* FocusStore.swift */; };
+		AD77D5C9C08B94F1D0F4727E /* TaskEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B00C4CC8B85CD65EEE2A95D /* TaskEditorSheet.swift */; };
+		BA4D884DE4D9384C490904F0 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F046BED7DEDADCEED30859D /* AppModel.swift */; };
+		C079EE76B8C229B6CBD468F5 /* FocusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECFF020BEAC0FD0B97E2CB3F /* FocusView.swift */; };
+		C11D56817E0DF0F2213C83E4 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6EA527ED2ACB600FE9E6656 /* HomeView.swift */; };
+		C144CFD30446A471DC40815A /* XPEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C58EB76F4A2D32B098FAD63A /* XPEntry.swift */; };
+		C52CA5C87F4EFC0302FDEAD7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FF1E9459F4CACF091C5EBF /* SettingsView.swift */; };
+		C552DA5C51D83311DDDACFE7 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EFFD5CDA1941BB3FDA51D6D /* AppTheme.swift */; };
+		C69D40197AF92E733C5CF1B6 /* Achievement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1141D1C9309FD0EE7CADFF5D /* Achievement.swift */; };
+		D79D5EE41C8E826C015E8201 /* GamificationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 359CA26A3E4EFC8F07215DD7 /* GamificationModels.swift */; };
+		D9290BD6D3006947B7B88DD0 /* TasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89F7E3B2F1CA477F484B2BC0 /* TasksView.swift */; };
+		E6F13E4FEB15D64C618D78C5 /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6044A0423520EA727C62DD25 /* SettingsStore.swift */; };
+		F220A4DEF0130F419E2F8D78 /* MaddyMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034FCD0E69A142EAC09C4CD4 /* MaddyMobileApp.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0232EB28D93CA45FBC3ADD60 /* RootTabView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
+		034FCD0E69A142EAC09C4CD4 /* MaddyMobileApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MaddyMobileApp.swift; sourceTree = "<group>"; };
+		0B00C4CC8B85CD65EEE2A95D /* TaskEditorSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskEditorSheet.swift; sourceTree = "<group>"; };
+		10FF1E9459F4CACF091C5EBF /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		1141D1C9309FD0EE7CADFF5D /* Achievement.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Achievement.swift; sourceTree = "<group>"; };
+		1D2EC572F62329AC4F877E7E /* YearHeatmapView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = YearHeatmapView.swift; sourceTree = "<group>"; };
+		263461F0A7D7893F87F14E45 /* TaskItem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskItem.swift; sourceTree = "<group>"; };
+		2760B0D041BC8015E8001F9A /* LocalJSONStorage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalJSONStorage.swift; sourceTree = "<group>"; };
+		2E28A17C0AE454229D471559 /* SymbolPicker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SymbolPicker.swift; sourceTree = "<group>"; };
+		359CA26A3E4EFC8F07215DD7 /* GamificationModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamificationModels.swift; sourceTree = "<group>"; };
+		3A9E5DFBF0AA1917446A57F7 /* StatsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
+		3EFFD5CDA1941BB3FDA51D6D /* AppTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
+		4395A4176944AD07982E015C /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		4C736F1D0AD76F35752B9C48 /* GamificationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamificationView.swift; sourceTree = "<group>"; };
+		4CC4D57F808CFE9DE3F2C713 /* FocusSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FocusSession.swift; sourceTree = "<group>"; };
+		50D73AB689D17AA54C341130 /* GlassCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlassCard.swift; sourceTree = "<group>"; };
+		6044A0423520EA727C62DD25 /* SettingsStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
+		6A711A96A166BB9DED387D9C /* TasksStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TasksStore.swift; sourceTree = "<group>"; };
+		785E021B71237938F5835F16 /* RadarChartView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RadarChartView.swift; sourceTree = "<group>"; };
+		7A4B307ED415C902B9B37F1B /* HabitStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HabitStore.swift; sourceTree = "<group>"; };
+		89F7E3B2F1CA477F484B2BC0 /* TasksView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TasksView.swift; sourceTree = "<group>"; };
+		8CEC1622C7DE47191569A5E0 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		95E68CD49FE9A081010F6C02 /* FocusStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FocusStore.swift; sourceTree = "<group>"; };
+		9F046BED7DEDADCEED30859D /* AppModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		A501E0E134F782EFCD17E1F8 /* RingTimerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RingTimerView.swift; sourceTree = "<group>"; };
+		BCE5731B6D13F87A39C94A35 /* GamificationStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamificationStore.swift; sourceTree = "<group>"; };
+		BD1D70E1DA4A86E50B42DA6E /* MaddyMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MaddyMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C2B3AAE3F096E6D507194218 /* HabitEditorSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HabitEditorSheet.swift; sourceTree = "<group>"; };
+		C58EB76F4A2D32B098FAD63A /* XPEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = XPEntry.swift; sourceTree = "<group>"; };
+		D89812BB18CF7B0DED578F6C /* HabitsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HabitsView.swift; sourceTree = "<group>"; };
+		E6EA527ED2ACB600FE9E6656 /* HomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		E76ECF4835D8CD248019A92A /* Habit.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Habit.swift; sourceTree = "<group>"; };
+		ECFF020BEAC0FD0B97E2CB3F /* FocusView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FocusView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		E36C3093A92F44DFCA28BF2D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				84B9A5DA43788272D90D5A43 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		02CA00BEF6F8EA16CE9E9E5D /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				1934CFE1A227B36FC0AD070D /* Components */,
+				410182A31C917521B62122AC /* Theme */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		04CFC0E847BDBE7F6A84DF89 /* Gamification */ = {
+			isa = PBXGroup;
+			children = (
+				4C736F1D0AD76F35752B9C48 /* GamificationView.swift */,
+			);
+			path = Gamification;
+			sourceTree = "<group>";
+		};
+		1934CFE1A227B36FC0AD070D /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				50D73AB689D17AA54C341130 /* GlassCard.swift */,
+				785E021B71237938F5835F16 /* RadarChartView.swift */,
+				A501E0E134F782EFCD17E1F8 /* RingTimerView.swift */,
+				1D2EC572F62329AC4F877E7E /* YearHeatmapView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		1A55EE4652A0473B8DF3CF4A /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				1141D1C9309FD0EE7CADFF5D /* Achievement.swift */,
+				4CC4D57F808CFE9DE3F2C713 /* FocusSession.swift */,
+				359CA26A3E4EFC8F07215DD7 /* GamificationModels.swift */,
+				E76ECF4835D8CD248019A92A /* Habit.swift */,
+				263461F0A7D7893F87F14E45 /* TaskItem.swift */,
+				C58EB76F4A2D32B098FAD63A /* XPEntry.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		22E3BFA53A8BB98066B23002 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				839BBA58FEB0ADD2E11FF544 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		2809378096C92E4ABF0F9C52 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				C672DA5644D0972833EE04AC /* Focus */,
+				04CFC0E847BDBE7F6A84DF89 /* Gamification */,
+				EEA96A9864DD471576358488 /* Habits */,
+				4054F21B882FD4766795D358 /* Home */,
+				CE5AFC38D8A3FA61C16DE286 /* Settings */,
+				B9710B01C77663AED31491F5 /* Stats */,
+				4C979AA9A3AFF6D93905BD04 /* Tasks */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		4054F21B882FD4766795D358 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				E6EA527ED2ACB600FE9E6656 /* HomeView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		410182A31C917521B62122AC /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				3EFFD5CDA1941BB3FDA51D6D /* AppTheme.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		46647A15C016BB52A10D7B96 = {
+			isa = PBXGroup;
+			children = (
+				A80858EB68E2C3B1DB8835E0 /* Products */,
+				22E3BFA53A8BB98066B23002 /* Frameworks */,
+				A8B487280FF4780951A6D9B7 /* MaddyMobile */,
+			);
+			sourceTree = "<group>";
+		};
+		4C979AA9A3AFF6D93905BD04 /* Tasks */ = {
+			isa = PBXGroup;
+			children = (
+				0B00C4CC8B85CD65EEE2A95D /* TaskEditorSheet.swift */,
+				89F7E3B2F1CA477F484B2BC0 /* TasksView.swift */,
+			);
+			path = Tasks;
+			sourceTree = "<group>";
+		};
+		839BBA58FEB0ADD2E11FF544 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				4395A4176944AD07982E015C /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		919CF3F4C58F70E039DCB314 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				1A55EE4652A0473B8DF3CF4A /* Models */,
+				B8D4925786A28D679D1B1280 /* Persistence */,
+				A4DB0381FBB32DF19D22C2B5 /* Stores */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		A4DB0381FBB32DF19D22C2B5 /* Stores */ = {
+			isa = PBXGroup;
+			children = (
+				9F046BED7DEDADCEED30859D /* AppModel.swift */,
+				95E68CD49FE9A081010F6C02 /* FocusStore.swift */,
+				BCE5731B6D13F87A39C94A35 /* GamificationStore.swift */,
+				7A4B307ED415C902B9B37F1B /* HabitStore.swift */,
+				6044A0423520EA727C62DD25 /* SettingsStore.swift */,
+				6A711A96A166BB9DED387D9C /* TasksStore.swift */,
+			);
+			path = Stores;
+			sourceTree = "<group>";
+		};
+		A80858EB68E2C3B1DB8835E0 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BD1D70E1DA4A86E50B42DA6E /* MaddyMobile.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A8B487280FF4780951A6D9B7 /* MaddyMobile */ = {
+			isa = PBXGroup;
+			children = (
+				E2C1D7B9ADD269E90F32BFFF /* App */,
+				919CF3F4C58F70E039DCB314 /* Core */,
+				2809378096C92E4ABF0F9C52 /* Features */,
+				02CA00BEF6F8EA16CE9E9E5D /* UI */,
+				8CEC1622C7DE47191569A5E0 /* Assets.xcassets */,
+			);
+			path = MaddyMobile;
+			sourceTree = "<group>";
+		};
+		B8D4925786A28D679D1B1280 /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				2760B0D041BC8015E8001F9A /* LocalJSONStorage.swift */,
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		B9710B01C77663AED31491F5 /* Stats */ = {
+			isa = PBXGroup;
+			children = (
+				3A9E5DFBF0AA1917446A57F7 /* StatsView.swift */,
+			);
+			path = Stats;
+			sourceTree = "<group>";
+		};
+		C672DA5644D0972833EE04AC /* Focus */ = {
+			isa = PBXGroup;
+			children = (
+				ECFF020BEAC0FD0B97E2CB3F /* FocusView.swift */,
+			);
+			path = Focus;
+			sourceTree = "<group>";
+		};
+		CE5AFC38D8A3FA61C16DE286 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				10FF1E9459F4CACF091C5EBF /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		E2C1D7B9ADD269E90F32BFFF /* App */ = {
+			isa = PBXGroup;
+			children = (
+				034FCD0E69A142EAC09C4CD4 /* MaddyMobileApp.swift */,
+				0232EB28D93CA45FBC3ADD60 /* RootTabView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		EEA96A9864DD471576358488 /* Habits */ = {
+			isa = PBXGroup;
+			children = (
+				C2B3AAE3F096E6D507194218 /* HabitEditorSheet.swift */,
+				D89812BB18CF7B0DED578F6C /* HabitsView.swift */,
+				2E28A17C0AE454229D471559 /* SymbolPicker.swift */,
+			);
+			path = Habits;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		19FB411AFD974CC4CA3DC39B /* MaddyMobile */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2C986D22948742B992732F30 /* Build configuration list for PBXNativeTarget "MaddyMobile" */;
+			buildPhases = (
+				039445C2E2FCF99F5757BAA5 /* Sources */,
+				E36C3093A92F44DFCA28BF2D /* Frameworks */,
+				AAC16F0D29D680FDEB0973FE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MaddyMobile;
+			productName = MaddyMobile;
+			productReference = BD1D70E1DA4A86E50B42DA6E /* MaddyMobile.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		502E2B26D43BD4FB973683AF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					19FB411AFD974CC4CA3DC39B = {
+						DevelopmentTeam = WDJ29FRHHF;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = E1D637A285F7DA73295930D4 /* Build configuration list for PBXProject "MaddyMobile" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 46647A15C016BB52A10D7B96;
+			productRefGroup = A80858EB68E2C3B1DB8835E0 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				19FB411AFD974CC4CA3DC39B /* MaddyMobile */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AAC16F0D29D680FDEB0973FE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				87D7D854F6B452066C461C87 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		039445C2E2FCF99F5757BAA5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F220A4DEF0130F419E2F8D78 /* MaddyMobileApp.swift in Sources */,
+				3AE64B6FCC7E580EDD1E9383 /* RootTabView.swift in Sources */,
+				C69D40197AF92E733C5CF1B6 /* Achievement.swift in Sources */,
+				844D8A77A17D6CDBF86D4DD5 /* FocusSession.swift in Sources */,
+				D79D5EE41C8E826C015E8201 /* GamificationModels.swift in Sources */,
+				8966158A0D30B77720AFF7AC /* Habit.swift in Sources */,
+				6905872AD21B7CBEC88324CA /* TaskItem.swift in Sources */,
+				C144CFD30446A471DC40815A /* XPEntry.swift in Sources */,
+				572E9802CD78F364FB0AAD4B /* LocalJSONStorage.swift in Sources */,
+				BA4D884DE4D9384C490904F0 /* AppModel.swift in Sources */,
+				AA3DCF3D545BE6FAE9A7BB34 /* FocusStore.swift in Sources */,
+				3F4D670C36A8A02549156B7E /* GamificationStore.swift in Sources */,
+				6D4978EC241B536DC547DAEB /* HabitStore.swift in Sources */,
+				E6F13E4FEB15D64C618D78C5 /* SettingsStore.swift in Sources */,
+				651A45491F07F99DB5B2C569 /* TasksStore.swift in Sources */,
+				C079EE76B8C229B6CBD468F5 /* FocusView.swift in Sources */,
+				1F196E44479C979C87E9A12A /* GamificationView.swift in Sources */,
+				553E1C8577AC33ED5348A11F /* HabitEditorSheet.swift in Sources */,
+				9FE8B1B41EC5D7846EC709ED /* HabitsView.swift in Sources */,
+				129594514013B66563441F72 /* SymbolPicker.swift in Sources */,
+				C11D56817E0DF0F2213C83E4 /* HomeView.swift in Sources */,
+				C52CA5C87F4EFC0302FDEAD7 /* SettingsView.swift in Sources */,
+				9CA087509B43837539181073 /* StatsView.swift in Sources */,
+				AD77D5C9C08B94F1D0F4727E /* TaskEditorSheet.swift in Sources */,
+				D9290BD6D3006947B7B88DD0 /* TasksView.swift in Sources */,
+				50DC882F95A16FB4E8AD98DD /* GlassCard.swift in Sources */,
+				059257FA9FAC670D2933A839 /* RadarChartView.swift in Sources */,
+				A3F00791A76A54D59BDD7B20 /* RingTimerView.swift in Sources */,
+				7CCED634E5C16454920626DA /* YearHeatmapView.swift in Sources */,
+				C552DA5C51D83311DDDACFE7 /* AppTheme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		7266E93179CF908878FEDADB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+					CLANG_ENABLE_MODULES = YES;
+					CLANG_ENABLE_OBJC_WEAK = NO;
+					CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_ASSET_PATHS = "\"MaddyMobile/Preview Content\"";
+				DEVELOPMENT_TEAM = WDJ29FRHHF;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.maddy.mobile;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		81A7E3FDE6A23BE3E6E6B9B1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		89B7DA98E2DBB03D6C58CEE6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+					CLANG_ENABLE_MODULES = YES;
+					CLANG_ENABLE_OBJC_WEAK = NO;
+					CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_ASSET_PATHS = "\"MaddyMobile/Preview Content\"";
+				DEVELOPMENT_TEAM = WDJ29FRHHF;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.maddy.mobile;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		BDD5414B52EE2E25CC1241C1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2C986D22948742B992732F30 /* Build configuration list for PBXNativeTarget "MaddyMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				89B7DA98E2DBB03D6C58CEE6 /* Release */,
+				7266E93179CF908878FEDADB /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E1D637A285F7DA73295930D4 /* Build configuration list for PBXProject "MaddyMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BDD5414B52EE2E25CC1241C1 /* Debug */,
+				81A7E3FDE6A23BE3E6E6B9B1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 502E2B26D43BD4FB973683AF /* Project object */;
+}
