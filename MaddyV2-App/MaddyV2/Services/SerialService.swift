@@ -20,7 +20,6 @@ import Darwin
 
 enum EspView: String {
     case idle
-    case music
     case focus
     case tasks
     case habits
@@ -99,9 +98,6 @@ final class SerialService: NSObject, ObservableObject {
     private var openTimeoutWorkItem: DispatchWorkItem?
     private var timeTicker: AnyCancellable?
     private var hasAnnouncedOpen = false
-
-    private var lastMusicPayload: String?
-    private var lastMusicSentAt: Date = .distantPast
 
     private var lastPomoPayload: String?
     private var lastPomoSentAt: Date = .distantPast
@@ -259,8 +255,6 @@ final class SerialService: NSObject, ObservableObject {
     func sendView(screen: String) {
         let normalized = screen.lowercased()
         switch normalized {
-        case "music":
-            setEspView(.music)
         case "focus":
             setEspView(.focus)
         case "tasks":
@@ -300,40 +294,6 @@ final class SerialService: NSObject, ObservableObject {
         timeFormatter.locale = Locale(identifier: "en_US_POSIX")
         timeFormatter.dateFormat = "HH:mm"
         sendTime(timeFormatter.string(from: date))
-    }
-
-    func sendMusic(state: String, artist: String, title: String, progress0to1: Double, vol0to1: Double) {
-        let payload = "music:\(sanitize(state.lowercased()))|\(sanitize(artist))|\(sanitize(title))"
-
-        let now = Date()
-        let shouldSend = payload != lastMusicPayload || now.timeIntervalSince(lastMusicSentAt) >= 3
-        guard shouldSend else { return }
-
-        if sendLine(payload) {
-            lastMusicPayload = payload
-            lastMusicSentAt = now
-        }
-    }
-
-    func sendMusic(snapshot: MusicSnapshot) {
-        let posSec = max(0, Int(snapshot.positionSeconds.rounded()))
-        let durSec = max(0, Int(snapshot.durationSeconds.rounded()))
-
-        let payload: String
-        if durSec > 0 {
-            payload = "music:\(sanitize(snapshot.state.rawValue.lowercased()))|\(sanitize(snapshot.artist))|\(sanitize(snapshot.title))|\(posSec)|\(durSec)"
-        } else {
-            payload = "music:\(sanitize(snapshot.state.rawValue.lowercased()))|\(sanitize(snapshot.artist))|\(sanitize(snapshot.title))"
-        }
-
-        let now = Date()
-        let shouldSend = payload != lastMusicPayload || now.timeIntervalSince(lastMusicSentAt) >= 3
-        guard shouldSend else { return }
-
-        if sendLine(payload) {
-            lastMusicPayload = payload
-            lastMusicSentAt = now
-        }
     }
 
     func sendPomo(phase: String, remaining: Int, total: Int, running: Bool) {

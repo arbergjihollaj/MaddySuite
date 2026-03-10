@@ -49,8 +49,10 @@ struct TasksView: View {
         .sheet(item: $editorTask) { task in
             TaskEditorSheet(task: task) { updated in
                 tasksStore.upsert(updated)
+                editorTask = nil
             } onDelete: { id in
                 tasksStore.delete(id: id)
+                editorTask = nil
             }
             .presentationDetents([.medium, .large])
             .preferredColorScheme(.dark)
@@ -148,6 +150,17 @@ struct TasksView: View {
                     }
                 }
                 .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(AppTheme.textSecondary)
+
+                HStack(spacing: 6) {
+                    Text(task.priority.title)
+                    Text(task.difficulty.title)
+                    if task.isDailyTask {
+                        Text("Daily")
+                    }
+                }
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .padding(.top, 2)
                 .foregroundStyle(AppTheme.textSecondary)
             }
         }

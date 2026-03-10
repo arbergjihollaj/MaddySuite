@@ -36,6 +36,11 @@ final class AppState: ObservableObject {
         didSet {
             let newSettings = settings
             let previousSettings = oldValue
+            let calendarSourcesChanged =
+                previousSettings.iCalSubscriptions != newSettings.iCalSubscriptions ||
+                previousSettings.showGoogleCalendarEvents != newSettings.showGoogleCalendarEvents ||
+                previousSettings.showICalCalendarEvents != newSettings.showICalCalendarEvents ||
+                previousSettings.showTaskCalendarEntries != newSettings.showTaskCalendarEntries
             persistSettings()
             applyAppearance()
             configureStatisticsAutoExportTimer()
@@ -43,7 +48,6 @@ final class AppState: ObservableObject {
                 guard let self else { return }
                 self.serialService.setAutoReconnect(enabled: newSettings.autoReconnect)
                 self.serialService.preferredPort = newSettings.preferredSerialPort
-                self.musicService.setPollingInterval(seconds: newSettings.musicPollingSeconds)
                 self.focusViewModel.dailyGoal = newSettings.dailyFocusGoal
                 self.gamificationService.recomputeFocusStreak(
                     from: self.focusViewModel.logs,
@@ -60,14 +64,22 @@ final class AppState: ObservableObject {
 
             if previousSettings.iCloudSyncEnabled != newSettings.iCloudSyncEnabled {
                 if newSettings.iCloudSyncEnabled {
+                    if (newSettings.syncFolderPath?.isEmpty ?? true),
+                       let defaultFolder = Self.defaultCloudSyncFolderURL(createIfMissing: true) {
+                        settings.syncFolderPath = defaultFolder.path
+                    }
                     scheduleCloudSync(reason: "icloud enabled", immediate: true)
                 } else {
                     cloudSyncDebounceTask?.cancel()
                     cloudSyncStatus = .disabled
                 }
+                configureCloudSyncPolling()
             }
 
             guard isApplyingCloudSnapshot == false else { return }
+            if calendarSourcesChanged {
+                markDomainChanged(.calendarSources)
+            }
             markDomainChanged(.settings)
             scheduleCloudSync(reason: "settings updated")
         }
@@ -81,7 +93,6 @@ final class AppState: ObservableObject {
     @Published private(set) var cloudSyncLastSuccessfulAt: Date?
 
     let serialService: SerialService
-    let musicService: MusicService
     let gamificationService: GamificationService
     let aiService: AIService
     let statisticsExportService: StatisticsExportService
@@ -101,23 +112,25 @@ final class AppState: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var clockTimer: AnyCancellable?
     private var statsTimer: AnyCancellable?
+    private var dailyLoopTimer: AnyCancellable?
     private var statisticsAutoExportTimer: AnyCancellable?
+    private var cloudSyncPollingTimer: AnyCancellable?
     private var appWillTerminateObserver: NSObjectProtocol?
     private var cloudSyncMetadata: CloudSyncMetadata
     private var cloudSyncDebounceTask: Task<Void, Never>?
     private var cloudSyncInFlight = false
     private var isApplyingCloudSnapshot = false
 
-    init(serialService: SerialService, musicService: MusicService) {
+    init(serialService: SerialService) {
         self.storage = JSONStorageService()
         self.serialService = serialService
-        self.musicService = musicService
         self.gamificationService = GamificationService()
         self.aiService = AIService()
         self.statisticsExportService = StatisticsExportService()
 
         var loadedSettings = storage.load(MaddySettings.self, from: .settings, fallback: .default)
         loadedSettings.topBarOrder = Self.normalizedTopOrder(loadedSettings.topBarOrder)
+        Self.bootstrapCloudSyncDefaults(in: &loadedSettings)
         let loadedTasks = storage.load([TaskItem].self, from: .tasks, fallback: [])
         let loadedTaskArchive = storage.load([ArchivedTaskItem].self, from: .taskArchive, fallback: [])
         let loadedHabits = storage.load([HabitItem].self, from: .habits, fallback: [])
@@ -152,8 +165,6 @@ final class AppState: ObservableObject {
         if loadedSettings.autoReconnect, let preferred = loadedSettings.preferredSerialPort {
             serialService.connect(to: preferred)
         }
-        musicService.setPollingInterval(seconds: loadedSettings.musicPollingSeconds)
-        musicService.startPolling()
 
         gamificationService.recomputeFocusStreak(
             from: focusViewModel.logs,
@@ -164,9 +175,11 @@ final class AppState: ObservableObject {
         sendGamifySnapshotToESP(reason: "init")
         startClockSync()
         startStatsSync()
+        startDailyLoop()
         configureStatisticsAutoExportTimer()
         registerAppWillTerminateObserver()
         captureStatisticsSnapshot()
+        configureCloudSyncPolling()
         scheduleCloudSync(reason: "app launch", immediate: true)
     }
 
@@ -174,7 +187,9 @@ final class AppState: ObservableObject {
         if let appWillTerminateObserver {
             NotificationCenter.default.removeObserver(appWillTerminateObserver)
         }
+        cloudSyncPollingTimer?.cancel()
         statisticsAutoExportTimer?.cancel()
+        dailyLoopTimer?.cancel()
         cloudSyncDebounceTask?.cancel()
     }
 
@@ -323,27 +338,63 @@ final class AppState: ObservableObject {
         NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: folderURL.path)
     }
 
+    // =====================================================
+    // MARK: - Calendar Subscriptions
+    // [TAG: V2_CALENDAR_SUBSCRIPTIONS]
+    // =====================================================
+
+    @discardableResult
+    func addICalSubscription(urlString: String, name: String? = nil) -> Bool {
+        let normalized = Self.normalizedICalURL(urlString)
+        guard normalized.isEmpty == false, URL(string: normalized) != nil else {
+            return false
+        }
+
+        if settings.iCalSubscriptions.contains(where: { $0.urlString.caseInsensitiveCompare(normalized) == .orderedSame }) {
+            return false
+        }
+
+        let displayName: String
+        if let name, name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            displayName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if let host = URL(string: normalized)?.host, host.isEmpty == false {
+            displayName = host
+        } else {
+            displayName = "Subscribed Calendar"
+        }
+
+        settings.iCalSubscriptions.append(
+            ICalSubscription(
+                id: UUID(),
+                name: displayName,
+                urlString: normalized,
+                isEnabled: true,
+                lastRefreshAt: nil,
+                lastError: nil
+            )
+        )
+        return true
+    }
+
+    func removeICalSubscription(id: UUID) {
+        settings.iCalSubscriptions.removeAll { $0.id == id }
+    }
+
+    func updateICalSubscriptionEnabled(id: UUID, isEnabled: Bool) {
+        guard let index = settings.iCalSubscriptions.firstIndex(where: { $0.id == id }) else { return }
+        settings.iCalSubscriptions[index].isEnabled = isEnabled
+    }
+
+    func updateICalSubscriptionRefreshMetadata(id: UUID, refreshedAt: Date?, error: String?) {
+        guard let index = settings.iCalSubscriptions.firstIndex(where: { $0.id == id }) else { return }
+        settings.iCalSubscriptions[index].lastRefreshAt = refreshedAt ?? settings.iCalSubscriptions[index].lastRefreshAt
+        settings.iCalSubscriptions[index].lastError = error
+    }
+
     private func wireServices() {
         aiService.gamificationContextProvider = { [weak self] in
             guard let self else { return "(none)" }
             return "Level \(self.gamificationService.currentLevel), totalXP \(self.gamificationService.totalXP), focusStreak \(self.gamificationService.dailyFocusStreak)."
-        }
-
-        gamificationService.personalizedChallengeProvider = { [weak self] dayKey, fallback in
-            guard let self else { return nil }
-
-            let context = """
-            level=\(self.gamificationService.currentLevel)
-            totalXP=\(self.gamificationService.totalXP)
-            focusStreak=\(self.gamificationService.dailyFocusStreak)
-            dailyGoal=\(self.settings.dailyFocusGoal)
-            """
-
-            return await self.aiService.generatePersonalizedDailyChallenges(
-                dayKey: dayKey,
-                fallback: fallback,
-                context: context
-            )
         }
 
         aiService.onXPReward = { [weak self] amount, reason in
@@ -372,18 +423,19 @@ final class AppState: ObservableObject {
             self?.focusViewModel.startFromTask(task.title)
         }
         tasksViewModel.onTaskCompleted = { [weak self] task in
-            self?.gamificationService.registerTaskCompletion(task)
+            guard let self else { return }
+            let completedToday = self.tasksViewModel.completedNormalTasksCount(for: Date())
+            self.gamificationService.registerTaskCompletion(task, completedToday: completedToday)
+        }
+        tasksViewModel.onDailyTaskMissed = { [weak self] task in
+            self?.gamificationService.registerMissedDailyTask(task)
         }
         habitsViewModel.onHabitCompleted = { [weak self] habit in
-            self?.gamificationService.registerHabitCompletion(habit)
+            guard let self else { return }
+            let lower = habit.title.lowercased()
+            let required = lower.contains("required") || lower.contains("must")
+            self.gamificationService.registerHabitCompletion(habit, isRequired: required)
         }
-
-        musicService.$snapshot
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] snapshot in
-                self?.serialService.sendMusic(snapshot: snapshot)
-            }
-            .store(in: &cancellables)
 
         serialService.$isConnected
             .removeDuplicates()
@@ -520,9 +572,52 @@ final class AppState: ObservableObject {
             }
     }
 
+    private func startDailyLoop() {
+        runDailyLoopTick()
+        dailyLoopTimer = Timer.publish(every: 60, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.runDailyLoopTick()
+            }
+    }
+
     private func sendDailyFocusStatsToESP() {
         guard serialService.isConnected else { return }
         serialService.sendLine("stats:daily=\(focusViewModel.todayFocusMinutes)")
+    }
+
+    private func runDailyLoopTick() {
+        tasksViewModel.applyDailyRollover()
+        let smartTemplates = gamificationService.generateSmartDailyTaskTemplates()
+        tasksViewModel.ensureDailyTaskCapacity(
+            count: settings.dailyTaskCount,
+            templates: smartTemplates
+        )
+
+        let now = Date()
+        let calendar = Calendar.current
+        let hour = calendar.component(.hour, from: now)
+        let minute = calendar.component(.minute, from: now)
+        guard hour == 20, minute <= 2 else { return }
+
+        let requiredHabits = habitsViewModel.habits.filter {
+            let lower = $0.title.lowercased()
+            return lower.contains("required") || lower.contains("must")
+        }
+        let dayKey = now.yyyymmdd
+        let completedRequired = requiredHabits.filter {
+            $0.history[dayKey, default: 0] >= $0.targetPerDay
+        }.count
+
+        let evaluation = GamificationDayEvaluation(
+            date: now,
+            dailyTasks: tasksViewModel.dailyTasks(for: now) + tasksViewModel.completedDailyTasks(for: now),
+            requiredHabitCount: requiredHabits.count,
+            completedRequiredHabitCount: completedRequired,
+            focusGoalReached: focusViewModel.todaySessions >= max(1, settings.dailyFocusGoal),
+            completedNormalTaskCount: tasksViewModel.completedNormalTasksCount(for: now)
+        )
+        gamificationService.evaluateDay(evaluation)
     }
 
     private func sendGamifySnapshotToESP(reason: String) {
@@ -530,10 +625,19 @@ final class AppState: ObservableObject {
         _ = reason
 
         let axes = GamificationSkillAxis.allCases
-        let values: [Int] = axes.map { axis in
+        var values: [Int] = axes.map { axis in
             let normalized = gamificationService.skills[axis]?.normalized0to1 ?? 0.0
             let clamped = min(1.0, max(0.0, normalized))
             return Int((clamped * 100.0).rounded())
+        }
+
+        values.append(gamificationService.momentum)
+        values.append(gamificationService.reliabilityNormalized)
+        if values.count > 6 {
+            values = Array(values.prefix(6))
+        }
+        while values.count < 6 {
+            values.append(0)
         }
 
         serialService.sendGamify(level: gamificationService.currentLevel, values: values)
@@ -549,6 +653,17 @@ final class AppState: ObservableObject {
     // MARK: - iCloud Sync
     // [TAG: V2_ICLOUD_SYNC]
     // =====================================================
+
+    private func configureCloudSyncPolling() {
+        cloudSyncPollingTimer?.cancel()
+        guard settings.iCloudSyncEnabled else { return }
+
+        cloudSyncPollingTimer = Timer.publish(every: 45, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.scheduleCloudSync(reason: "periodic refresh", immediate: true)
+            }
+    }
 
     private func scheduleCloudSync(reason: String, immediate: Bool = false) {
         guard settings.iCloudSyncEnabled else {
@@ -670,10 +785,17 @@ final class AppState: ObservableObject {
             let payload = CloudFocusPayload(logs: focusViewModel.logs)
             return try? encoder.encode(payload)
         case .gamification:
-            let payload = CloudGamificationPayload(snapshot: gamificationService.cloudSnapshot())
-            return try? encoder.encode(payload)
+            return try? encoder.encode(gamificationService.cloudSnapshot())
         case .settings:
             let payload = CloudSettingsPayload(snapshot: settings.cloudSnapshot())
+            return try? encoder.encode(payload)
+        case .calendarSources:
+            let payload = CloudCalendarSourcesPayload(
+                iCalSubscriptions: settings.iCalSubscriptions,
+                showGoogleCalendarEvents: settings.showGoogleCalendarEvents,
+                showICalCalendarEvents: settings.showICalCalendarEvents,
+                showTaskCalendarEntries: settings.showTaskCalendarEntries
+            )
             return try? encoder.encode(payload)
         }
     }
@@ -705,13 +827,28 @@ final class AppState: ObservableObject {
             )
             return true
         case .gamification:
-            guard let decoded = try? decoder.decode(CloudGamificationPayload.self, from: payload) else { return false }
-            gamificationService.applyCloudSnapshot(decoded.snapshot)
-            return true
+            if let decoded = try? decoder.decode(GamificationService.CloudSnapshot.self, from: payload) {
+                gamificationService.applyCloudSnapshot(decoded)
+                return true
+            }
+            if let wrapped = try? decoder.decode(CloudGamificationPayload.self, from: payload) {
+                gamificationService.applyCloudSnapshot(wrapped.snapshot)
+                return true
+            }
+            return false
         case .settings:
             guard let decoded = try? decoder.decode(CloudSettingsPayload.self, from: payload) else { return false }
             var merged = settings
             merged.applyCloudSnapshot(decoded.snapshot)
+            settings = merged
+            return true
+        case .calendarSources:
+            guard let decoded = try? decoder.decode(CloudCalendarSourcesPayload.self, from: payload) else { return false }
+            var merged = settings
+            merged.iCalSubscriptions = decoded.iCalSubscriptions
+            merged.showGoogleCalendarEvents = decoded.showGoogleCalendarEvents
+            merged.showICalCalendarEvents = decoded.showICalCalendarEvents
+            merged.showTaskCalendarEntries = decoded.showTaskCalendarEntries
             settings = merged
             return true
         }
@@ -740,6 +877,46 @@ final class AppState: ObservableObject {
             return nil
         }
         return base
+    }
+
+    private static func defaultCloudSyncFolderURL(createIfMissing: Bool) -> URL? {
+        let fm = FileManager.default
+        var candidates: [URL] = []
+
+        if let iCloudBase = defaultICloudDriveBaseFolder() {
+            candidates.append(iCloudBase.appendingPathComponent("ESP-Projects/MaddySuite/Icloud-Sync", isDirectory: true))
+            candidates.append(iCloudBase.appendingPathComponent("MaddySuite/Icloud-Sync", isDirectory: true))
+        }
+
+        let cwdCandidate = URL(fileURLWithPath: fm.currentDirectoryPath, isDirectory: true)
+            .appendingPathComponent("Icloud-Sync", isDirectory: true)
+        candidates.append(cwdCandidate)
+
+        for candidate in candidates {
+            var isDirectory: ObjCBool = false
+            if fm.fileExists(atPath: candidate.path, isDirectory: &isDirectory), isDirectory.boolValue {
+                return candidate
+            }
+        }
+
+        guard createIfMissing, let preferred = candidates.first else { return nil }
+        do {
+            try fm.createDirectory(at: preferred, withIntermediateDirectories: true)
+            return preferred
+        } catch {
+            return nil
+        }
+    }
+
+    private static func bootstrapCloudSyncDefaults(in settings: inout MaddySettings) {
+        if (settings.syncFolderPath?.isEmpty ?? true),
+           let defaultFolder = defaultCloudSyncFolderURL(createIfMissing: true) {
+            settings.syncFolderPath = defaultFolder.path
+        }
+
+        if settings.syncFolderPath?.isEmpty == false {
+            settings.iCloudSyncEnabled = true
+        }
     }
 
     private func loadCloudSyncEnvelope(from url: URL) throws -> CloudSyncEnvelope? {
@@ -856,7 +1033,16 @@ final class AppState: ObservableObject {
         )
     }
 
-    private static func normalizedTopOrder(_ order: [AppRoute]) -> [AppRoute] {
+    private static func normalizedICalURL(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return "" }
+        if trimmed.lowercased().hasPrefix("webcal://") {
+            return "https://" + trimmed.dropFirst("webcal://".count)
+        }
+        return trimmed
+    }
+
+    nonisolated private static func normalizedTopOrder(_ order: [AppRoute]) -> [AppRoute] {
         var normalized = order
         for route in AppRoute.allCases where normalized.contains(route) == false {
             normalized.append(route)
@@ -881,16 +1067,21 @@ struct MaddySettings: Codable {
     var debugLogsEnabled: Bool
 
     var menuBarEnabled: Bool
-    var musicPollingSeconds: Double
 
     var focusSoundEnabled: Bool
     var focusSoundVolume: Double
     var dailyFocusGoal: Int
+    var dailyTaskCount: Int
+    var dailySummaryEnabled: Bool
 
     var taskDefaultPriority: TaskPriority
     var habitWeekStartsMonday: Bool
     var autoExportStatistics: Bool
     var aiPlaceholderStyle: AIPlaceholderStyle
+    var showGoogleCalendarEvents: Bool
+    var showICalCalendarEvents: Bool
+    var showTaskCalendarEntries: Bool
+    var iCalSubscriptions: [ICalSubscription]
     var iCloudSyncEnabled: Bool
     var syncFolderPath: String?
 
@@ -903,16 +1094,29 @@ struct MaddySettings: Codable {
         case autoReconnect
         case debugLogsEnabled
         case menuBarEnabled
-        case musicPollingSeconds
         case focusSoundEnabled
         case focusSoundVolume
         case dailyFocusGoal
+        case dailyTaskCount
+        case dailySummaryEnabled
         case taskDefaultPriority
         case habitWeekStartsMonday
         case autoExportStatistics
         case aiPlaceholderStyle
+        case showGoogleCalendarEvents
+        case showICalCalendarEvents
+        case showTaskCalendarEntries
+        case iCalSubscriptions
         case iCloudSyncEnabled
         case syncFolderPath
+    }
+
+    private static func normalizedTopOrder(_ order: [AppRoute]) -> [AppRoute] {
+        var normalized = order
+        for route in AppRoute.allCases where normalized.contains(route) == false {
+            normalized.append(route)
+        }
+        return normalized
     }
 
     init(
@@ -924,14 +1128,19 @@ struct MaddySettings: Codable {
         autoReconnect: Bool,
         debugLogsEnabled: Bool,
         menuBarEnabled: Bool,
-        musicPollingSeconds: Double,
         focusSoundEnabled: Bool,
         focusSoundVolume: Double,
         dailyFocusGoal: Int,
+        dailyTaskCount: Int,
+        dailySummaryEnabled: Bool,
         taskDefaultPriority: TaskPriority,
         habitWeekStartsMonday: Bool,
         autoExportStatistics: Bool,
         aiPlaceholderStyle: AIPlaceholderStyle,
+        showGoogleCalendarEvents: Bool,
+        showICalCalendarEvents: Bool,
+        showTaskCalendarEntries: Bool,
+        iCalSubscriptions: [ICalSubscription],
         iCloudSyncEnabled: Bool,
         syncFolderPath: String?
     ) {
@@ -943,14 +1152,19 @@ struct MaddySettings: Codable {
         self.autoReconnect = autoReconnect
         self.debugLogsEnabled = debugLogsEnabled
         self.menuBarEnabled = menuBarEnabled
-        self.musicPollingSeconds = musicPollingSeconds
         self.focusSoundEnabled = focusSoundEnabled
         self.focusSoundVolume = focusSoundVolume
         self.dailyFocusGoal = dailyFocusGoal
+        self.dailyTaskCount = dailyTaskCount
+        self.dailySummaryEnabled = dailySummaryEnabled
         self.taskDefaultPriority = taskDefaultPriority
         self.habitWeekStartsMonday = habitWeekStartsMonday
         self.autoExportStatistics = autoExportStatistics
         self.aiPlaceholderStyle = aiPlaceholderStyle
+        self.showGoogleCalendarEvents = showGoogleCalendarEvents
+        self.showICalCalendarEvents = showICalCalendarEvents
+        self.showTaskCalendarEntries = showTaskCalendarEntries
+        self.iCalSubscriptions = iCalSubscriptions
         self.iCloudSyncEnabled = iCloudSyncEnabled
         self.syncFolderPath = syncFolderPath
     }
@@ -964,15 +1178,20 @@ struct MaddySettings: Codable {
         autoReconnect: true,
         debugLogsEnabled: true,
         menuBarEnabled: true,
-        musicPollingSeconds: 3,
         focusSoundEnabled: true,
         focusSoundVolume: 0.65,
         dailyFocusGoal: 8,
+        dailyTaskCount: 3,
+        dailySummaryEnabled: true,
         taskDefaultPriority: .medium,
         habitWeekStartsMonday: true,
         autoExportStatistics: true,
         aiPlaceholderStyle: .orb,
-        iCloudSyncEnabled: false,
+        showGoogleCalendarEvents: true,
+        showICalCalendarEvents: true,
+        showTaskCalendarEntries: true,
+        iCalSubscriptions: [],
+        iCloudSyncEnabled: true,
         syncFolderPath: nil
     )
 
@@ -982,20 +1201,36 @@ struct MaddySettings: Codable {
 
         accentHex = try c.decodeIfPresent(String.self, forKey: .accentHex) ?? defaults.accentHex
         glassIntensity = try c.decodeIfPresent(Double.self, forKey: .glassIntensity) ?? defaults.glassIntensity
-        topBarOrder = try c.decodeIfPresent([AppRoute].self, forKey: .topBarOrder) ?? defaults.topBarOrder
-        homeWidgets = try c.decodeIfPresent([HomeWidgetKind].self, forKey: .homeWidgets) ?? defaults.homeWidgets
+        let decodedTopOrder: [AppRoute]? = (try? c.decode([String].self, forKey: .topBarOrder))?
+            .compactMap(AppRoute.init(rawValue:))
+        if let decodedTopOrder, decodedTopOrder.isEmpty == false {
+            topBarOrder = Self.normalizedTopOrder(decodedTopOrder)
+        } else {
+            topBarOrder = (try c.decodeIfPresent([AppRoute].self, forKey: .topBarOrder).map(Self.normalizedTopOrder) ?? defaults.topBarOrder)
+        }
+
+        let decodedWidgets: [HomeWidgetKind]? = (try? c.decode([String].self, forKey: .homeWidgets))?
+            .compactMap(HomeWidgetKind.init(rawValue:))
+        homeWidgets = decodedWidgets?.isEmpty == false
+            ? decodedWidgets!
+            : (try c.decodeIfPresent([HomeWidgetKind].self, forKey: .homeWidgets) ?? defaults.homeWidgets)
         preferredSerialPort = try c.decodeIfPresent(String.self, forKey: .preferredSerialPort)
         autoReconnect = try c.decodeIfPresent(Bool.self, forKey: .autoReconnect) ?? defaults.autoReconnect
         debugLogsEnabled = try c.decodeIfPresent(Bool.self, forKey: .debugLogsEnabled) ?? defaults.debugLogsEnabled
         menuBarEnabled = try c.decodeIfPresent(Bool.self, forKey: .menuBarEnabled) ?? defaults.menuBarEnabled
-        musicPollingSeconds = try c.decodeIfPresent(Double.self, forKey: .musicPollingSeconds) ?? defaults.musicPollingSeconds
         focusSoundEnabled = try c.decodeIfPresent(Bool.self, forKey: .focusSoundEnabled) ?? defaults.focusSoundEnabled
         focusSoundVolume = try c.decodeIfPresent(Double.self, forKey: .focusSoundVolume) ?? defaults.focusSoundVolume
         dailyFocusGoal = try c.decodeIfPresent(Int.self, forKey: .dailyFocusGoal) ?? defaults.dailyFocusGoal
+        dailyTaskCount = try c.decodeIfPresent(Int.self, forKey: .dailyTaskCount) ?? defaults.dailyTaskCount
+        dailySummaryEnabled = try c.decodeIfPresent(Bool.self, forKey: .dailySummaryEnabled) ?? defaults.dailySummaryEnabled
         taskDefaultPriority = try c.decodeIfPresent(TaskPriority.self, forKey: .taskDefaultPriority) ?? defaults.taskDefaultPriority
         habitWeekStartsMonday = try c.decodeIfPresent(Bool.self, forKey: .habitWeekStartsMonday) ?? defaults.habitWeekStartsMonday
         autoExportStatistics = try c.decodeIfPresent(Bool.self, forKey: .autoExportStatistics) ?? defaults.autoExportStatistics
         aiPlaceholderStyle = try c.decodeIfPresent(AIPlaceholderStyle.self, forKey: .aiPlaceholderStyle) ?? defaults.aiPlaceholderStyle
+        showGoogleCalendarEvents = try c.decodeIfPresent(Bool.self, forKey: .showGoogleCalendarEvents) ?? defaults.showGoogleCalendarEvents
+        showICalCalendarEvents = try c.decodeIfPresent(Bool.self, forKey: .showICalCalendarEvents) ?? defaults.showICalCalendarEvents
+        showTaskCalendarEntries = try c.decodeIfPresent(Bool.self, forKey: .showTaskCalendarEntries) ?? defaults.showTaskCalendarEntries
+        iCalSubscriptions = try c.decodeIfPresent([ICalSubscription].self, forKey: .iCalSubscriptions) ?? defaults.iCalSubscriptions
         iCloudSyncEnabled = try c.decodeIfPresent(Bool.self, forKey: .iCloudSyncEnabled) ?? defaults.iCloudSyncEnabled
         syncFolderPath = try c.decodeIfPresent(String.self, forKey: .syncFolderPath)
     }
@@ -1010,14 +1245,19 @@ struct MaddySettings: Codable {
         try c.encode(autoReconnect, forKey: .autoReconnect)
         try c.encode(debugLogsEnabled, forKey: .debugLogsEnabled)
         try c.encode(menuBarEnabled, forKey: .menuBarEnabled)
-        try c.encode(musicPollingSeconds, forKey: .musicPollingSeconds)
         try c.encode(focusSoundEnabled, forKey: .focusSoundEnabled)
         try c.encode(focusSoundVolume, forKey: .focusSoundVolume)
         try c.encode(dailyFocusGoal, forKey: .dailyFocusGoal)
+        try c.encode(dailyTaskCount, forKey: .dailyTaskCount)
+        try c.encode(dailySummaryEnabled, forKey: .dailySummaryEnabled)
         try c.encode(taskDefaultPriority, forKey: .taskDefaultPriority)
         try c.encode(habitWeekStartsMonday, forKey: .habitWeekStartsMonday)
         try c.encode(autoExportStatistics, forKey: .autoExportStatistics)
         try c.encode(aiPlaceholderStyle, forKey: .aiPlaceholderStyle)
+        try c.encode(showGoogleCalendarEvents, forKey: .showGoogleCalendarEvents)
+        try c.encode(showICalCalendarEvents, forKey: .showICalCalendarEvents)
+        try c.encode(showTaskCalendarEntries, forKey: .showTaskCalendarEntries)
+        try c.encode(iCalSubscriptions, forKey: .iCalSubscriptions)
         try c.encode(iCloudSyncEnabled, forKey: .iCloudSyncEnabled)
         try c.encodeIfPresent(syncFolderPath, forKey: .syncFolderPath)
     }
@@ -1030,14 +1270,96 @@ extension MaddySettings {
         var topBarOrder: [AppRoute]
         var homeWidgets: [HomeWidgetKind]
         var menuBarEnabled: Bool
-        var musicPollingSeconds: Double
         var focusSoundEnabled: Bool
         var focusSoundVolume: Double
         var dailyFocusGoal: Int
+        var dailyTaskCount: Int
+        var dailySummaryEnabled: Bool
         var taskDefaultPriority: TaskPriority
         var habitWeekStartsMonday: Bool
         var autoExportStatistics: Bool
         var aiPlaceholderStyle: AIPlaceholderStyle
+
+        enum CodingKeys: String, CodingKey {
+            case accentHex
+            case glassIntensity
+            case topBarOrder
+            case homeWidgets
+            case menuBarEnabled
+            case focusSoundEnabled
+            case focusSoundVolume
+            case dailyFocusGoal
+            case dailyTaskCount
+            case dailySummaryEnabled
+            case taskDefaultPriority
+            case habitWeekStartsMonday
+            case autoExportStatistics
+            case aiPlaceholderStyle
+        }
+
+        init(
+            accentHex: String,
+            glassIntensity: Double,
+            topBarOrder: [AppRoute],
+            homeWidgets: [HomeWidgetKind],
+            menuBarEnabled: Bool,
+            focusSoundEnabled: Bool,
+            focusSoundVolume: Double,
+            dailyFocusGoal: Int,
+            dailyTaskCount: Int,
+            dailySummaryEnabled: Bool,
+            taskDefaultPriority: TaskPriority,
+            habitWeekStartsMonday: Bool,
+            autoExportStatistics: Bool,
+            aiPlaceholderStyle: AIPlaceholderStyle
+        ) {
+            self.accentHex = accentHex
+            self.glassIntensity = glassIntensity
+            self.topBarOrder = topBarOrder
+            self.homeWidgets = homeWidgets
+            self.menuBarEnabled = menuBarEnabled
+            self.focusSoundEnabled = focusSoundEnabled
+            self.focusSoundVolume = focusSoundVolume
+            self.dailyFocusGoal = dailyFocusGoal
+            self.dailyTaskCount = dailyTaskCount
+            self.dailySummaryEnabled = dailySummaryEnabled
+            self.taskDefaultPriority = taskDefaultPriority
+            self.habitWeekStartsMonday = habitWeekStartsMonday
+            self.autoExportStatistics = autoExportStatistics
+            self.aiPlaceholderStyle = aiPlaceholderStyle
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            let defaults = MaddySettings.default.cloudSnapshot()
+
+            accentHex = try c.decodeIfPresent(String.self, forKey: .accentHex) ?? defaults.accentHex
+            glassIntensity = try c.decodeIfPresent(Double.self, forKey: .glassIntensity) ?? defaults.glassIntensity
+
+            if let routeStrings = try? c.decode([String].self, forKey: .topBarOrder) {
+                topBarOrder = MaddySettings.normalizedTopOrder(routeStrings.compactMap(AppRoute.init(rawValue:)))
+            } else {
+                topBarOrder = MaddySettings.normalizedTopOrder(try c.decodeIfPresent([AppRoute].self, forKey: .topBarOrder) ?? defaults.topBarOrder)
+            }
+
+            if let widgetStrings = try? c.decode([String].self, forKey: .homeWidgets) {
+                let decoded = widgetStrings.compactMap(HomeWidgetKind.init(rawValue:))
+                homeWidgets = decoded.isEmpty ? defaults.homeWidgets : decoded
+            } else {
+                homeWidgets = try c.decodeIfPresent([HomeWidgetKind].self, forKey: .homeWidgets) ?? defaults.homeWidgets
+            }
+
+            menuBarEnabled = try c.decodeIfPresent(Bool.self, forKey: .menuBarEnabled) ?? defaults.menuBarEnabled
+            focusSoundEnabled = try c.decodeIfPresent(Bool.self, forKey: .focusSoundEnabled) ?? defaults.focusSoundEnabled
+            focusSoundVolume = try c.decodeIfPresent(Double.self, forKey: .focusSoundVolume) ?? defaults.focusSoundVolume
+            dailyFocusGoal = try c.decodeIfPresent(Int.self, forKey: .dailyFocusGoal) ?? defaults.dailyFocusGoal
+            dailyTaskCount = try c.decodeIfPresent(Int.self, forKey: .dailyTaskCount) ?? defaults.dailyTaskCount
+            dailySummaryEnabled = try c.decodeIfPresent(Bool.self, forKey: .dailySummaryEnabled) ?? defaults.dailySummaryEnabled
+            taskDefaultPriority = try c.decodeIfPresent(TaskPriority.self, forKey: .taskDefaultPriority) ?? defaults.taskDefaultPriority
+            habitWeekStartsMonday = try c.decodeIfPresent(Bool.self, forKey: .habitWeekStartsMonday) ?? defaults.habitWeekStartsMonday
+            autoExportStatistics = try c.decodeIfPresent(Bool.self, forKey: .autoExportStatistics) ?? defaults.autoExportStatistics
+            aiPlaceholderStyle = try c.decodeIfPresent(AIPlaceholderStyle.self, forKey: .aiPlaceholderStyle) ?? defaults.aiPlaceholderStyle
+        }
     }
 
     func cloudSnapshot() -> CloudSnapshot {
@@ -1047,10 +1369,11 @@ extension MaddySettings {
             topBarOrder: topBarOrder,
             homeWidgets: homeWidgets,
             menuBarEnabled: menuBarEnabled,
-            musicPollingSeconds: musicPollingSeconds,
             focusSoundEnabled: focusSoundEnabled,
             focusSoundVolume: focusSoundVolume,
             dailyFocusGoal: dailyFocusGoal,
+            dailyTaskCount: dailyTaskCount,
+            dailySummaryEnabled: dailySummaryEnabled,
             taskDefaultPriority: taskDefaultPriority,
             habitWeekStartsMonday: habitWeekStartsMonday,
             autoExportStatistics: autoExportStatistics,
@@ -1064,10 +1387,11 @@ extension MaddySettings {
         topBarOrder = snapshot.topBarOrder
         homeWidgets = snapshot.homeWidgets
         menuBarEnabled = snapshot.menuBarEnabled
-        musicPollingSeconds = snapshot.musicPollingSeconds
         focusSoundEnabled = snapshot.focusSoundEnabled
         focusSoundVolume = snapshot.focusSoundVolume
         dailyFocusGoal = snapshot.dailyFocusGoal
+        dailyTaskCount = snapshot.dailyTaskCount
+        dailySummaryEnabled = snapshot.dailySummaryEnabled
         taskDefaultPriority = snapshot.taskDefaultPriority
         habitWeekStartsMonday = snapshot.habitWeekStartsMonday
         autoExportStatistics = snapshot.autoExportStatistics
@@ -1086,13 +1410,19 @@ enum CloudSyncStatus: Equatable {
 
 private enum CloudSyncDomain: String, CaseIterable {
     case settings
+    case calendarSources
     case tasks
     case habits
     case focus
     case gamification
 
     var fileName: String {
-        "mac_\(rawValue)_sync.json"
+        switch self {
+        case .calendarSources:
+            return "calendar_sources_sync.json"
+        default:
+            return "mac_\(rawValue)_sync.json"
+        }
     }
 }
 
@@ -1129,6 +1459,13 @@ private struct CloudSettingsPayload: Codable {
     var snapshot: MaddySettings.CloudSnapshot
 }
 
+private struct CloudCalendarSourcesPayload: Codable {
+    var iCalSubscriptions: [ICalSubscription]
+    var showGoogleCalendarEvents: Bool
+    var showICalCalendarEvents: Bool
+    var showTaskCalendarEntries: Bool
+}
+
 // =====================================================
 // MARK: - AI Placeholder Style
 // [TAG: AI_PLACEHOLDER_STYLE]
@@ -1154,6 +1491,20 @@ enum AIPlaceholderStyle: String, Codable, CaseIterable, Identifiable {
 }
 
 // =====================================================
+// MARK: - Calendar Subscription Model
+// [TAG: V2_CALENDAR_SUBSCRIPTION_MODEL]
+// =====================================================
+
+struct ICalSubscription: Identifiable, Codable, Equatable {
+    var id: UUID
+    var name: String
+    var urlString: String
+    var isEnabled: Bool
+    var lastRefreshAt: Date?
+    var lastError: String?
+}
+
+// =====================================================
 // MARK: - Task Models
 // [TAG: V2_TASK_MODELS]
 // =====================================================
@@ -1174,18 +1525,51 @@ enum TaskPriority: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-enum TaskStatus: String, Codable, CaseIterable, Identifiable {
+enum TaskDifficulty: String, Codable, CaseIterable, Identifiable {
+    case easy
+    case medium
+    case hard
+
+    var id: String { rawValue }
+
+    var xpReward: Int {
+        switch self {
+        case .easy: return 8
+        case .medium: return 12
+        case .hard: return 18
+        }
+    }
+}
+
+enum TaskSkillTag: String, Codable, CaseIterable, Identifiable {
+    case focus
+    case execution
+    case routine
+    case reliability
+
+    var id: String { rawValue }
+
+    var title: String { rawValue.capitalized }
+}
+
+enum TaskStatus: String, Codable, Identifiable, CaseIterable {
     case backlog
     case inProgress
     case done
+    case missed
 
     var id: String { rawValue }
+
+    static var allCases: [TaskStatus] {
+        [.backlog, .inProgress, .done]
+    }
 
     var title: String {
         switch self {
         case .backlog: return "Backlog"
         case .inProgress: return "In Progress"
         case .done: return "Done"
+        case .missed: return "Missed"
         }
     }
 }
@@ -1205,11 +1589,17 @@ struct TaskItem: Identifiable, Codable, Equatable {
     var notes: String
     var dueDate: Date?
     var priority: TaskPriority
+    var difficulty: TaskDifficulty
     var tags: [String]
     var status: TaskStatus
+    var mappedSkills: [TaskSkillTag]
+    var isDailyTask: Bool
+    var isRequiredDailyTask: Bool
+    var dailyDateKey: String?
     var recurrence: TaskRecurrence
     var order: Int
     var createdAt: Date
+    var updatedAt: Date
     var completedAt: Date?
 
     init(
@@ -1218,11 +1608,17 @@ struct TaskItem: Identifiable, Codable, Equatable {
         notes: String,
         dueDate: Date?,
         priority: TaskPriority,
+        difficulty: TaskDifficulty,
         tags: [String],
         status: TaskStatus,
+        mappedSkills: [TaskSkillTag],
+        isDailyTask: Bool,
+        isRequiredDailyTask: Bool,
+        dailyDateKey: String?,
         recurrence: TaskRecurrence,
         order: Int,
         createdAt: Date,
+        updatedAt: Date,
         completedAt: Date?
     ) {
         self.id = id
@@ -1230,11 +1626,17 @@ struct TaskItem: Identifiable, Codable, Equatable {
         self.notes = notes
         self.dueDate = dueDate
         self.priority = priority
+        self.difficulty = difficulty
         self.tags = tags
         self.status = status
+        self.mappedSkills = mappedSkills
+        self.isDailyTask = isDailyTask
+        self.isRequiredDailyTask = isRequiredDailyTask
+        self.dailyDateKey = dailyDateKey
         self.recurrence = recurrence
         self.order = order
         self.createdAt = createdAt
+        self.updatedAt = updatedAt
         self.completedAt = completedAt
     }
 
@@ -1245,13 +1647,38 @@ struct TaskItem: Identifiable, Codable, Equatable {
             notes: "",
             dueDate: nil,
             priority: defaultPriority,
+            difficulty: .medium,
             tags: [],
             status: .backlog,
+            mappedSkills: [.execution],
+            isDailyTask: false,
+            isRequiredDailyTask: false,
+            dailyDateKey: nil,
             recurrence: .none,
             order: 0,
             createdAt: Date(),
+            updatedAt: Date(),
             completedAt: nil
         )
+    }
+
+    var effectiveDailyKey: String {
+        if let dailyDateKey, dailyDateKey.isEmpty == false {
+            return dailyDateKey
+        }
+        return Self.dayKey(Date())
+    }
+
+    var isOverdue: Bool {
+        guard let dueDate else { return false }
+        return dueDate < Date() && status != .done
+    }
+
+    static func dayKey(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
 
     // Backward-compatible decode for older persisted tasks that may miss fields.
@@ -1262,11 +1689,17 @@ struct TaskItem: Identifiable, Codable, Equatable {
         notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
         dueDate = try c.decodeIfPresent(Date.self, forKey: .dueDate)
         priority = try c.decodeIfPresent(TaskPriority.self, forKey: .priority) ?? .medium
+        difficulty = try c.decodeIfPresent(TaskDifficulty.self, forKey: .difficulty) ?? .medium
         tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
         status = try c.decodeIfPresent(TaskStatus.self, forKey: .status) ?? .backlog
+        mappedSkills = try c.decodeIfPresent([TaskSkillTag].self, forKey: .mappedSkills) ?? [.execution]
+        isDailyTask = try c.decodeIfPresent(Bool.self, forKey: .isDailyTask) ?? false
+        isRequiredDailyTask = try c.decodeIfPresent(Bool.self, forKey: .isRequiredDailyTask) ?? false
+        dailyDateKey = try c.decodeIfPresent(String.self, forKey: .dailyDateKey)
         recurrence = try c.decodeIfPresent(TaskRecurrence.self, forKey: .recurrence) ?? .none
         order = try c.decodeIfPresent(Int.self, forKey: .order) ?? 0
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
         completedAt = try c.decodeIfPresent(Date.self, forKey: .completedAt)
     }
 }
@@ -1276,6 +1709,106 @@ struct ArchivedTaskItem: Identifiable, Codable, Equatable {
     var task: TaskItem
     var archivedAt: Date
     var sourceStatus: TaskStatus
+}
+
+// =====================================================
+// MARK: - Daily Task Library
+// [TAG: V2_DAILY_TASK_LIBRARY]
+// =====================================================
+
+struct DailyTaskLibraryItem: Identifiable, Codable, Equatable {
+    var id: String
+    var title: String
+    var subtitle: String?
+    var pack: String
+    var difficulty: TaskDifficulty
+    var preferredSkills: [TaskSkillTag]
+    var requiredByDefault: Bool
+    var systemGenerated: Bool
+    var tags: [String]
+
+    func makeTask(dayKey: String, date: Date) -> TaskItem {
+        let mergedTags = Array(Set(["daily", "pack", "pack:\(pack)"] + tags)).sorted()
+        return TaskItem(
+            id: UUID(),
+            title: title,
+            notes: subtitle ?? "",
+            dueDate: nil,
+            priority: .medium,
+            difficulty: difficulty,
+            tags: mergedTags,
+            status: .backlog,
+            mappedSkills: preferredSkills.isEmpty ? [.reliability] : Array(preferredSkills.prefix(2)),
+            isDailyTask: true,
+            isRequiredDailyTask: requiredByDefault,
+            dailyDateKey: dayKey,
+            recurrence: .none,
+            order: 0,
+            createdAt: date,
+            updatedAt: date,
+            completedAt: nil
+        )
+    }
+}
+
+enum DailyTaskLibrary {
+    static let knownPacks: [String] = ["productivity", "routine", "cleanSpace", "reset", "student", "discipline"]
+
+    static let items: [DailyTaskLibraryItem] = [
+        .init(id: "prod_important_morning", title: "Complete 1 important task before 12:00", subtitle: "Prioritize impact early in the day.", pack: "productivity", difficulty: .medium, preferredSkills: [.execution, .reliability], requiredByDefault: true, systemGenerated: true, tags: ["important", "morning", "execution-balance"]),
+        .init(id: "prod_two_medium", title: "Finish 2 medium tasks", subtitle: "Convert planning into shipped output.", pack: "productivity", difficulty: .medium, preferredSkills: [.execution], requiredByDefault: true, systemGenerated: true, tags: ["throughput", "execution-balance"]),
+        .init(id: "prod_backlog_three", title: "Clear 3 small backlog items", subtitle: "Reduce carry-over and keep your board clean.", pack: "productivity", difficulty: .easy, preferredSkills: [.execution, .reliability], requiredByDefault: false, systemGenerated: true, tags: ["backlog", "cleanup"]),
+        .init(id: "prod_avoidance_task", title: "Do 1 task you have been avoiding", subtitle: "Pick the one you've postponed the longest.", pack: "productivity", difficulty: .hard, preferredSkills: [.execution, .focus], requiredByDefault: false, systemGenerated: true, tags: ["avoidance", "courage"]),
+        .init(id: "prod_priority_reset", title: "Do a short reset and review priorities", subtitle: "Spend 10 minutes re-ordering your top tasks.", pack: "productivity", difficulty: .easy, preferredSkills: [.reliability], requiredByDefault: false, systemGenerated: true, tags: ["planning", "reset"]),
+
+        .init(id: "routine_required_habits", title: "Complete all required habits today", subtitle: "No required habit misses for the day.", pack: "routine", difficulty: .medium, preferredSkills: [.routine, .reliability], requiredByDefault: true, systemGenerated: true, tags: ["habit", "consistency", "routine-recovery"]),
+        .init(id: "routine_morning_anchor", title: "Finish your morning routine before lunch", subtitle: "Lock in your baseline routine early.", pack: "routine", difficulty: .medium, preferredSkills: [.routine], requiredByDefault: true, systemGenerated: true, tags: ["morning", "habit"]),
+        .init(id: "routine_evening_reset", title: "Complete your evening reset routine", subtitle: "Close the day with a clean handoff for tomorrow.", pack: "routine", difficulty: .easy, preferredSkills: [.routine, .reliability], requiredByDefault: false, systemGenerated: true, tags: ["evening", "routine-recovery"]),
+        .init(id: "routine_habit_streak", title: "Advance one habit streak today", subtitle: "Complete at least one habit currently on a streak.", pack: "routine", difficulty: .easy, preferredSkills: [.routine], requiredByDefault: false, systemGenerated: true, tags: ["streak", "habit"]),
+
+        .init(id: "clean_desk_ten", title: "Spend 10 minutes organizing your desk", subtitle: "Remove clutter and reset your work surface.", pack: "cleanSpace", difficulty: .easy, preferredSkills: [.routine], requiredByDefault: false, systemGenerated: true, tags: ["environment", "cleanup"]),
+        .init(id: "clean_inbox_zero", title: "Clear your top 10 inbox items", subtitle: "Email/messages/notes count.", pack: "cleanSpace", difficulty: .medium, preferredSkills: [.execution], requiredByDefault: false, systemGenerated: true, tags: ["digital", "cleanup"]),
+        .init(id: "clean_workspace_reset", title: "Reset one digital workspace", subtitle: "Files, desktop, or project folders.", pack: "cleanSpace", difficulty: .easy, preferredSkills: [.reliability], requiredByDefault: false, systemGenerated: true, tags: ["digital", "reset"]),
+        .init(id: "clean_quick_declutter", title: "Do a 5-minute quick declutter sprint", subtitle: "Set a timer and clean one area only.", pack: "cleanSpace", difficulty: .easy, preferredSkills: [.routine], requiredByDefault: false, systemGenerated: true, tags: ["physical", "recovery-reset"]),
+
+        .init(id: "reset_focus_25", title: "Do 1 focused 25-minute session", subtitle: "Single deep block with no context switching.", pack: "reset", difficulty: .medium, preferredSkills: [.focus], requiredByDefault: true, systemGenerated: true, tags: ["focus-gap", "recovery-reset"]),
+        .init(id: "reset_focus_goal", title: "Reach your focus goal today", subtitle: "Hit your current daily focus target.", pack: "reset", difficulty: .hard, preferredSkills: [.focus, .reliability], requiredByDefault: false, systemGenerated: true, tags: ["focus-gap", "goal"]),
+        .init(id: "reset_one_finish", title: "Finish 1 task start-to-finish in one sitting", subtitle: "No task hopping during this one.", pack: "reset", difficulty: .medium, preferredSkills: [.focus, .execution], requiredByDefault: false, systemGenerated: true, tags: ["execution-balance", "recovery-reset"]),
+        .init(id: "reset_reliability_task", title: "Complete a task mapped to Reliability", subtitle: "Choose a consistency-heavy task.", pack: "reset", difficulty: .easy, preferredSkills: [.reliability], requiredByDefault: false, systemGenerated: true, tags: ["reliability-rebuild"]),
+
+        .init(id: "student_study_block", title: "Complete one focused study block", subtitle: "25-45 minutes of uninterrupted study.", pack: "student", difficulty: .medium, preferredSkills: [.focus], requiredByDefault: true, systemGenerated: true, tags: ["study", "focus-gap"]),
+        .init(id: "student_summary", title: "Write a short summary of one concept", subtitle: "5-8 bullet points is enough.", pack: "student", difficulty: .medium, preferredSkills: [.execution], requiredByDefault: false, systemGenerated: true, tags: ["study", "execution-balance"]),
+        .init(id: "student_review_notes", title: "Review and clean up your notes for 15 minutes", subtitle: "Organize, rename, and mark action points.", pack: "student", difficulty: .easy, preferredSkills: [.routine], requiredByDefault: false, systemGenerated: true, tags: ["study", "cleanup"]),
+        .init(id: "student_assignment_push", title: "Make visible progress on one assignment", subtitle: "Complete one concrete sub-step.", pack: "student", difficulty: .hard, preferredSkills: [.execution, .reliability], requiredByDefault: false, systemGenerated: true, tags: ["study", "important"]),
+
+        .init(id: "discipline_daily_complete", title: "Complete all daily tasks today", subtitle: "Finish the whole daily set.", pack: "discipline", difficulty: .hard, preferredSkills: [.reliability], requiredByDefault: true, systemGenerated: true, tags: ["consistency", "reliability-rebuild"]),
+        .init(id: "discipline_no_overdue", title: "Resolve 1 overdue task", subtitle: "Bring one overdue item back to done.", pack: "discipline", difficulty: .medium, preferredSkills: [.reliability, .execution], requiredByDefault: false, systemGenerated: true, tags: ["overdue", "reliability-rebuild"]),
+        .init(id: "discipline_three_done", title: "Complete 3 tasks with clean handoff notes", subtitle: "Keep your progress verifiable.", pack: "discipline", difficulty: .hard, preferredSkills: [.execution, .reliability], requiredByDefault: false, systemGenerated: true, tags: ["consistency", "execution-balance"]),
+        .init(id: "discipline_follow_plan", title: "Stick to your top 3 priorities for the day", subtitle: "No extra commitments until those are done.", pack: "discipline", difficulty: .medium, preferredSkills: [.reliability], requiredByDefault: false, systemGenerated: true, tags: ["planning", "reliability-rebuild"])
+    ]
+
+    static func tasks(
+        pack: String? = nil,
+        count: Int,
+        dayKey: String,
+        date: Date,
+        excludingTitles: Set<String> = [],
+        matchingAnyTags: [String] = []
+    ) -> [TaskItem] {
+        let normalizedExclusions = Set(excludingTitles.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() })
+        let loweredTags = Set(matchingAnyTags.map { $0.lowercased() })
+        let sanitizedPack = pack.flatMap { knownPacks.contains($0) ? $0 : nil }
+
+        let pool = items.filter { item in
+            if let sanitizedPack, item.pack != sanitizedPack { return false }
+            if normalizedExclusions.contains(item.title.lowercased()) { return false }
+            if loweredTags.isEmpty { return true }
+            return item.tags.contains { loweredTags.contains($0.lowercased()) }
+        }
+
+        let selected = Array(pool.shuffled().prefix(max(0, count)))
+        return selected.map { $0.makeTask(dayKey: dayKey, date: date) }
+    }
 }
 
 // =====================================================
@@ -1374,7 +1907,6 @@ enum HomeWidgetKind: String, Codable, CaseIterable, Identifiable {
     case focus
     case tasks
     case habits
-    case music
     case serial
 
     var id: String { rawValue }
@@ -1384,7 +1916,6 @@ enum HomeWidgetKind: String, Codable, CaseIterable, Identifiable {
         case .focus: return "Focus"
         case .tasks: return "Tasks"
         case .habits: return "Habits"
-        case .music: return "Music"
         case .serial: return "ESP"
         }
     }
@@ -1609,6 +2140,7 @@ final class TasksViewModel: ObservableObject {
 
     var onStartFocus: ((TaskItem) -> Void)?
     var onTaskCompleted: ((TaskItem) -> Void)?
+    var onDailyTaskMissed: ((TaskItem) -> Void)?
 
     private let persist: ([TaskItem], [ArchivedTaskItem]) -> Void
 
@@ -1654,15 +2186,22 @@ final class TasksViewModel: ObservableObject {
 
         var task = draft
         task.title = cleanTitle
+        task.updatedAt = Date()
+        if task.isDailyTask, task.dailyDateKey == nil {
+            task.dailyDateKey = TaskItem.dayKey(Date())
+        }
         var previousStatus: TaskStatus?
 
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             previousStatus = tasks[index].status
             task.order = tasks[index].order
             task.createdAt = tasks[index].createdAt
+            task.updatedAt = Date()
             tasks[index] = task
         } else {
             task.order = nextOrder(in: task.status)
+            task.createdAt = Date()
+            task.updatedAt = task.createdAt
             tasks.append(task)
         }
 
@@ -1723,6 +2262,35 @@ final class TasksViewModel: ObservableObject {
         tasks
             .filter { $0.status == status }
             .sorted(by: laneComparator)
+    }
+
+    func dailyTasks(for date: Date = Date()) -> [TaskItem] {
+        let dayKey = TaskItem.dayKey(date)
+        return tasks.filter {
+            $0.isDailyTask &&
+            $0.effectiveDailyKey == dayKey &&
+            $0.status != .done &&
+            $0.status != .missed
+        }
+    }
+
+    func completedDailyTasks(for date: Date = Date()) -> [TaskItem] {
+        let dayKey = TaskItem.dayKey(date)
+        return archivedTasks.map(\.task).filter {
+            $0.isDailyTask &&
+            $0.effectiveDailyKey == dayKey &&
+            $0.status == .done
+        }
+    }
+
+    func completedNormalTasksCount(for date: Date = Date()) -> Int {
+        let calendar = Calendar.current
+        return archivedTasks.reduce(into: 0) { partial, archived in
+            guard archived.task.isDailyTask == false else { return }
+            guard let completedAt = archived.task.completedAt else { return }
+            guard calendar.isDate(completedAt, inSameDayAs: date) else { return }
+            partial += 1
+        }
     }
 
     func delete(taskID: UUID) {
@@ -1790,6 +2358,7 @@ final class TasksViewModel: ObservableObject {
 
         var moving = tasks[movingIndex]
         moving.status = newStatus
+        moving.updatedAt = Date()
 
         if newStatus != .done {
             moving.completedAt = nil
@@ -1808,12 +2377,94 @@ final class TasksViewModel: ObservableObject {
             guard let global = tasks.firstIndex(where: { $0.id == id }) else { continue }
             tasks[global].status = newStatus
             tasks[global].order = idx
+            tasks[global].updatedAt = Date()
         }
 
         if previousStatus != newStatus {
             normalizeOrders(for: previousStatus)
         }
 
+        persistAll()
+    }
+
+    func applyDailyRollover(now: Date = Date()) {
+        let currentDayKey = TaskItem.dayKey(now)
+        let staleDaily = tasks.filter {
+            $0.isDailyTask &&
+            $0.effectiveDailyKey != currentDayKey &&
+            $0.status != .done &&
+            $0.status != .missed
+        }
+        guard staleDaily.isEmpty == false else { return }
+
+        for task in staleDaily {
+            var missed = task
+            missed.status = .missed
+            missed.updatedAt = now
+            tasks.removeAll { $0.id == missed.id }
+            archivedTasks.insert(
+                ArchivedTaskItem(
+                    id: UUID(),
+                    task: missed,
+                    archivedAt: now,
+                    sourceStatus: .missed
+                ),
+                at: 0
+            )
+            onDailyTaskMissed?(missed)
+        }
+        persistAll()
+    }
+
+    func ensureDailyTaskCapacity(count: Int, templates: [TaskItem] = [], date: Date = Date()) {
+        let targetCount = max(1, count)
+        let dayKey = TaskItem.dayKey(date)
+        let existing = dailyTasks(for: date)
+        let needed = max(0, targetCount - existing.count)
+        guard needed > 0 else { return }
+
+        var generated: [TaskItem] = []
+
+        if templates.isEmpty == false {
+            for template in templates.prefix(needed) {
+                var clone = template
+                clone.id = UUID()
+                clone.status = .backlog
+                clone.order = nextOrder(in: .backlog)
+                clone.dailyDateKey = dayKey
+                clone.isDailyTask = true
+                clone.createdAt = date
+                clone.updatedAt = date
+                clone.completedAt = nil
+                generated.append(clone)
+            }
+        }
+
+        let existingTitles = Set((existing + generated).map { $0.title.lowercased() })
+        let fallback = DailyTaskLibrary.tasks(
+            pack: nil,
+            count: max(0, needed - generated.count),
+            dayKey: dayKey,
+            date: date,
+            excludingTitles: existingTitles
+        )
+        generated.append(contentsOf: fallback)
+
+        while generated.count < needed {
+            let refill = DailyTaskLibrary.tasks(pack: nil, count: 1, dayKey: dayKey, date: date)
+            guard let extra = refill.first else { break }
+            generated.append(extra)
+        }
+
+        let baseOrder = nextOrder(in: .backlog)
+        generated = generated.enumerated().map { index, task in
+            var copy = task
+            copy.order = baseOrder + index
+            return copy
+        }
+
+        tasks.append(contentsOf: generated)
+        normalizeOrders(for: .backlog)
         persistAll()
     }
 
@@ -1825,6 +2476,7 @@ final class TasksViewModel: ObservableObject {
         next.status = .backlog
         next.completedAt = nil
         next.createdAt = Date()
+        next.updatedAt = next.createdAt
         next.order = nextOrder(in: .backlog)
 
         if let due = completed.dueDate {
@@ -1874,6 +2526,7 @@ final class TasksViewModel: ObservableObject {
         var archivedTask = task
         archivedTask.status = .done
         archivedTask.completedAt = archivedTask.completedAt ?? Date()
+        archivedTask.updatedAt = Date()
 
         tasks.removeAll { $0.id == archivedTask.id }
 

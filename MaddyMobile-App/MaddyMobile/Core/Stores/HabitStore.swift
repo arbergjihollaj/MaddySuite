@@ -28,6 +28,7 @@ final class HabitStore: ObservableObject {
     private let fileName = "habits.json"
     private(set) var lastModifiedAt: Date
     private var isApplyingCloudSnapshot = false
+    private var lastStreakDecayDayKey: String?
 
     init(storage: LocalJSONStorage = .shared) {
         self.storage = storage
@@ -83,6 +84,28 @@ final class HabitStore: ObservableObject {
 
         touchLocalMutation()
         onHabitCompleted?(habit)
+    }
+
+    func applyStreakDecay(now: Date = Date()) {
+        let todayKey = Self.dayKey(now)
+        guard lastStreakDecayDayKey != todayKey else { return }
+        lastStreakDecayDayKey = todayKey
+
+        guard let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: now) else { return }
+        let yesterdayKey = Self.dayKey(yesterday)
+
+        var changed = false
+        for index in habits.indices {
+            let completedYesterday = (habits[index].history[yesterdayKey] ?? 0) >= habits[index].targetValue
+            if completedYesterday == false, habits[index].streak > 0 {
+                habits[index].streak = 0
+                changed = true
+            }
+        }
+
+        if changed {
+            touchLocalMutation()
+        }
     }
 
     func totalCompletions(forYear year: Int) -> [Date: Int] {

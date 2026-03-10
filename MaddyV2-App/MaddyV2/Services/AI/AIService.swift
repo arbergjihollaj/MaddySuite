@@ -1057,6 +1057,8 @@ final class AIService: ObservableObject {
             return max(15, min(120, proposed > 0 ? proposed : fallback))
         case .studySession:
             return max(15, min(180, proposed > 0 ? proposed : fallback))
+        default:
+            return max(1, proposed > 0 ? proposed : fallback)
         }
     }
 

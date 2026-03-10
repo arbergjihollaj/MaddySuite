@@ -51,6 +51,9 @@ final class FocusStore: ObservableObject {
         }
     }
 
+    @Published private(set) var completionSignal: Int = 0
+    @Published private(set) var completionMessage: String?
+
     var onSessionRecorded: ((FocusSession) -> Void)?
     var onDataChanged: (() -> Void)?
 
@@ -166,6 +169,8 @@ final class FocusStore: ObservableObject {
         let entry = FocusSession(id: UUID(), startDate: start, endDate: end, durationMinutes: minutes, mode: selectedMode)
         sessions.insert(entry, at: 0)
         onSessionRecorded?(entry)
+        completionMessage = "Focus Complete"
+        completionSignal += 1
         sessionStartDate = nil
     }
 

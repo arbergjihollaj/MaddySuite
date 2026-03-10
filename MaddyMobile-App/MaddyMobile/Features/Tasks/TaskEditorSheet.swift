@@ -14,6 +14,9 @@ struct TaskEditorSheet: View {
     @State private var tagsText: String
     @State private var hasDueDate: Bool
     @State private var showDeleteConfirm = false
+    @State private var primarySkill: TaskSkillTag
+    @State private var secondarySkillEnabled: Bool
+    @State private var secondarySkill: TaskSkillTag
 
     let onSave: (TaskItem) -> Void
     let onDelete: (UUID) -> Void
@@ -22,6 +25,10 @@ struct TaskEditorSheet: View {
         _draft = State(initialValue: task)
         _tagsText = State(initialValue: task.tags.joined(separator: ", "))
         _hasDueDate = State(initialValue: task.dueDate != nil)
+        let mapped = task.mappedSkills
+        _primarySkill = State(initialValue: mapped.first ?? .execution)
+        _secondarySkillEnabled = State(initialValue: mapped.count > 1)
+        _secondarySkill = State(initialValue: mapped.dropFirst().first ?? .reliability)
         self.onSave = onSave
         self.onDelete = onDelete
     }
@@ -38,6 +45,18 @@ struct TaskEditorSheet: View {
                         }
                     }
 
+                    Picker("Difficulty", selection: $draft.difficulty) {
+                        ForEach(TaskDifficulty.allCases) { value in
+                            Text(value.title).tag(value)
+                        }
+                    }
+
+                    Picker("Priority", selection: $draft.priority) {
+                        ForEach(TaskPriority.allCases) { value in
+                            Text(value.title).tag(value)
+                        }
+                    }
+
                     Toggle("Due date", isOn: $hasDueDate)
                     if hasDueDate {
                         DatePicker("Due", selection: Binding(
@@ -47,6 +66,25 @@ struct TaskEditorSheet: View {
                     }
 
                     TextField("Tags (comma separated)", text: $tagsText)
+
+                    Toggle("Daily task", isOn: $draft.isDailyTask)
+                    if draft.isDailyTask {
+                        Toggle("Required daily task", isOn: $draft.isRequiredDailyTask)
+                    }
+
+                    Picker("Primary skill", selection: $primarySkill) {
+                        ForEach(TaskSkillTag.allCases) { tag in
+                            Text(tag.title).tag(tag)
+                        }
+                    }
+                    Toggle("Second skill", isOn: $secondarySkillEnabled)
+                    if secondarySkillEnabled {
+                        Picker("Secondary skill", selection: $secondarySkill) {
+                            ForEach(TaskSkillTag.allCases) { tag in
+                                Text(tag.title).tag(tag)
+                            }
+                        }
+                    }
                 }
 
                 Section {
@@ -89,6 +127,15 @@ struct TaskEditorSheet: View {
 
         if hasDueDate == false {
             next.dueDate = nil
+        }
+
+        next.mappedSkills = secondarySkillEnabled && secondarySkill != primarySkill
+            ? [primarySkill, secondarySkill]
+            : [primarySkill]
+        if next.isDailyTask {
+            next.dailyDateKey = TaskItem.dayKey(Date())
+        } else {
+            next.dailyDateKey = nil
         }
 
         onSave(next)

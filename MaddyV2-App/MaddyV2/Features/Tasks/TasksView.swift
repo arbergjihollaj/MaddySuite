@@ -387,6 +387,8 @@ private struct TaskCardView: View {
             return Color.orange.opacity(0.10)
         case .done:
             return Color.green.opacity(0.10)
+        case .missed:
+            return Color.red.opacity(0.12)
         }
     }
 

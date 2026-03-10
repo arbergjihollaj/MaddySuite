@@ -1,0 +1,301 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DevicePlatform {
+  IOS
+  MACOS
+  UNKNOWN
+}
+
+enum TaskStatus {
+  BACKLOG
+  IN_PROGRESS
+  DONE
+  MISSED
+  DELETED
+}
+
+enum TaskDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum FocusMode {
+  POMODORO
+  CUSTOM
+}
+
+enum AttachmentStatus {
+  PENDING
+  READY
+  DELETED
+}
+
+enum ChangeEntityType {
+  TASK
+  HABIT
+  HABIT_ENTRY
+  FOCUS_SESSION
+  SETTINGS
+  ATTACHMENT
+  DEVICE
+}
+
+enum ChangeOperation {
+  CREATED
+  UPDATED
+  DELETED
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+model User {
+  id          String   @id @default(uuid()) @db.Uuid
+  clerkUserId String?  @unique @map("clerk_user_id")
+  email       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  devices        Device[]
+  tasks          Task[]
+  habits         Habit[]
+  habitEntries   HabitEntry[]
+  focusSessions  FocusSession[]
+  settings       Setting?
+  attachments    Attachment[]
+  syncCursors    SyncCursor[]
+  changes        Change[]
+  outboxEvents   OutboxEvent[]
+  clientMutations ClientMutation[]
+
+  @@map("users")
+}
+
+model Device {
+  id             String         @id @default(uuid()) @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
+  clientDeviceId String         @map("client_device_id")
+  platform       DevicePlatform @default(UNKNOWN)
+  appVersion     String?        @map("app_version")
+  lastSeenAt     DateTime?      @map("last_seen_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncCursors    SyncCursor[]
+  clientMutations ClientMutation[]
+
+  @@unique([userId, clientDeviceId])
+  @@index([userId])
+  @@map("devices")
+}
+
+model Task {
+  id                 String         @id @db.Uuid
+  userId             String         @map("user_id") @db.Uuid
+  title              String
+  dueAt              DateTime?      @map("due_at")
+  tags               Json           @default("[]")
+  status             TaskStatus     @default(BACKLOG)
+  difficulty         TaskDifficulty @default(MEDIUM)
+  priority           TaskPriority   @default(MEDIUM)
+  mappedSkills       Json           @default("[\"execution\"]") @map("mapped_skills")
+  isDailyTask        Boolean        @default(false) @map("is_daily_task")
+  isRequiredDailyTask Boolean       @default(false) @map("is_required_daily_task")
+  dailyDateKey       String?        @map("daily_date_key")
+  completedAt        DateTime?      @map("completed_at")
+  deletedAt          DateTime?      @map("deleted_at")
+  clientUpdatedAt    DateTime       @map("client_updated_at")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@index([userId, deletedAt])
+  @@map("tasks")
+}
+
+model Habit {
+  id               String   @id @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  title            String
+  symbol           String
+  colorHex         String   @map("color_hex")
+  goalKind         String   @map("goal_kind")
+  targetValue      Int      @map("target_value")
+  scheduleMode     String   @map("schedule_mode")
+  weekdays         Json     @default("[]")
+  everyXDays       Int      @default(1) @map("every_x_days")
+  streak           Int      @default(0)
+  lastCompletedDateKey String? @map("last_completed_date_key")
+  deletedAt        DateTime? @map("deleted_at")
+  clientUpdatedAt  DateTime @map("client_updated_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries          HabitEntry[]
+
+  @@index([userId, updatedAt])
+  @@map("habits")
+}
+
+model HabitEntry {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  habitId         String   @map("habit_id") @db.Uuid
+  dayKey          String   @map("day_key")
+  value           Int      @default(0)
+  clientUpdatedAt DateTime @map("client_updated_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habit           Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, dayKey])
+  @@index([userId, updatedAt])
+  @@map("habit_entries")
+}
+
+model FocusSession {
+  id              String   @id @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  deviceId        String?  @map("device_id") @db.Uuid
+  startAt         DateTime @map("start_at")
+  endAt           DateTime @map("end_at")
+  durationMinutes Int      @map("duration_minutes")
+  mode            FocusMode
+  deletedAt       DateTime? @map("deleted_at")
+  clientUpdatedAt DateTime @map("client_updated_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@map("focus_sessions")
+}
+
+model Setting {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  payload         Json     @default("{}")
+  clientUpdatedAt DateTime @map("client_updated_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("settings")
+}
+
+model Attachment {
+  id              String           @id @default(uuid()) @db.Uuid
+  userId          String           @map("user_id") @db.Uuid
+  taskId          String?          @map("task_id") @db.Uuid
+  habitId         String?          @map("habit_id") @db.Uuid
+  objectKey       String           @map("object_key")
+  bucket          String
+  fileName        String           @map("file_name")
+  contentType     String           @map("content_type")
+  sizeBytes       Int?             @map("size_bytes")
+  etag            String?
+  status          AttachmentStatus @default(PENDING)
+  metadata        Json             @default("{}")
+  clientUpdatedAt DateTime         @map("client_updated_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@map("attachments")
+}
+
+model SyncCursor {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  deviceId  String   @map("device_id") @db.Uuid
+  cursor    BigInt   @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId])
+  @@map("sync_cursors")
+}
+
+model Change {
+  id          BigInt          @id @default(autoincrement())
+  userId      String          @map("user_id") @db.Uuid
+  entityType  ChangeEntityType @map("entity_type")
+  entityId    String          @map("entity_id") @db.Uuid
+  operation   ChangeOperation
+  payload     Json            @default("{}")
+  occurredAt  DateTime        @default(now()) @map("occurred_at")
+  sourceDeviceId String?      @map("source_device_id") @db.Uuid
+  sourceMutationId String?    @map("source_mutation_id")
+
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, id])
+  @@index([userId, occurredAt])
+  @@map("changes")
+}
+
+model OutboxEvent {
+  id          BigInt      @id @default(autoincrement())
+  userId      String      @map("user_id") @db.Uuid
+  topic       String
+  payload     Json
+  status      OutboxStatus @default(PENDING)
+  attempts    Int         @default(0)
+  availableAt DateTime    @default(now()) @map("available_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+  @@map("outbox_events")
+}
+
+model ClientMutation {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  deviceId         String   @map("device_id") @db.Uuid
+  clientMutationId String   @map("client_mutation_id")
+  mutationType     String   @map("mutation_type")
+  entityType       ChangeEntityType? @map("entity_type")
+  entityId         String?  @map("entity_id") @db.Uuid
+  response         Json?
+  processedAt      DateTime @default(now()) @map("processed_at")
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device           Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId, clientMutationId])
+  @@index([userId, processedAt])
+  @@map("client_mutations")
+}

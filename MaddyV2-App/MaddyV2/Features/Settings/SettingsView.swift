@@ -15,7 +15,6 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var serialService: SerialService
-    @EnvironmentObject var musicService: MusicService
     @EnvironmentObject var fileShelfStore: FileShelfStore
     @Environment(\.openWindow) private var openWindow
     @State private var topBarOrderDraft: [AppRoute] = []
@@ -25,6 +24,7 @@ struct SettingsView: View {
     @State private var iCloudSyncStatusText: String = ""
     @State private var showClearArchiveConfirm = false
     @State private var selectedCategory: SettingsCategory = .general
+    @State private var iCalURLInput: String = ""
     @AppStorage("maddy.ai.showQuickActions") private var aiShowQuickActions: Bool = true
     @AppStorage("maddy.ai.showDailyChallenge") private var aiShowDailyChallenge: Bool = true
     @AppStorage("maddy.ai.showToolStrip") private var aiShowToolStrip: Bool = true
@@ -128,8 +128,8 @@ struct SettingsView: View {
             }
         case .ai:
             aiSection
-        case .music:
-            musicSection
+        case .calendar:
+            calendarSection
         case .focus:
             focusSection
         case .habits:
@@ -273,21 +273,6 @@ struct SettingsView: View {
         }
     }
 
-    private var musicSection: some View {
-        GlassCard(title: "Music", accent: appState.accentColor) {
-            HStack {
-                Text("Polling")
-                Slider(value: Binding(
-                    get: { appState.settings.musicPollingSeconds },
-                    set: { appState.settings.musicPollingSeconds = $0 }
-                ), in: 1...10, step: 1)
-                Text("\(Int(appState.settings.musicPollingSeconds))s")
-                    .monospacedDigit()
-                    .frame(width: 36)
-            }
-        }
-    }
-
     private var aiSection: some View {
         VStack(spacing: 14) {
             AISettingsView(ai: appState.aiService)
@@ -357,6 +342,18 @@ struct SettingsView: View {
                         .monospacedDigit()
                         .frame(width: 44)
                 }
+
+                Divider().opacity(0.25)
+
+                Stepper("Daily Task Count: \(appState.settings.dailyTaskCount)", value: Binding(
+                    get: { appState.settings.dailyTaskCount },
+                    set: { appState.settings.dailyTaskCount = max(1, min(8, $0)) }
+                ), in: 1...8)
+
+                Toggle("Show Daily Summary at 20:00", isOn: Binding(
+                    get: { appState.settings.dailySummaryEnabled },
+                    set: { appState.settings.dailySummaryEnabled = $0 }
+                ))
             }
         }
     }
@@ -475,6 +472,110 @@ struct SettingsView: View {
                 get: { appState.settings.habitWeekStartsMonday },
                 set: { appState.settings.habitWeekStartsMonday = $0 }
             ))
+        }
+    }
+
+    private var calendarSection: some View {
+        GlassCard(title: "Calendar Sources", accent: appState.accentColor) {
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle("Show Google Calendar events", isOn: Binding(
+                    get: { appState.settings.showGoogleCalendarEvents },
+                    set: { appState.settings.showGoogleCalendarEvents = $0 }
+                ))
+
+                Toggle("Show iCal subscription events", isOn: Binding(
+                    get: { appState.settings.showICalCalendarEvents },
+                    set: { appState.settings.showICalCalendarEvents = $0 }
+                ))
+
+                Toggle("Show Maddy tasks with date", isOn: Binding(
+                    get: { appState.settings.showTaskCalendarEntries },
+                    set: { appState.settings.showTaskCalendarEntries = $0 }
+                ))
+
+                Divider().opacity(0.2)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("iCal Subscriptions")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+
+                    HStack(spacing: 8) {
+                        TextField("https://example.com/calendar.ics", text: $iCalURLInput)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+
+                        Button {
+                            let success = appState.addICalSubscription(urlString: iCalURLInput)
+                            if success {
+                                iCalURLInput = ""
+                            }
+                        } label: {
+                            Label("Add", systemImage: "plus")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(appState.accentColor)
+                    }
+
+                    if appState.settings.iCalSubscriptions.isEmpty {
+                        Text("No subscriptions added yet.")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        VStack(spacing: 8) {
+                            ForEach(appState.settings.iCalSubscriptions) { subscription in
+                                HStack(spacing: 10) {
+                                    Toggle(isOn: Binding(
+                                        get: { subscription.isEnabled },
+                                        set: { appState.updateICalSubscriptionEnabled(id: subscription.id, isEnabled: $0) }
+                                    )) {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(subscription.name)
+                                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                                .lineLimit(1)
+                                            Text(subscription.urlString)
+                                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                            if let error = subscription.lastError, error.isEmpty == false {
+                                                Text(error)
+                                                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                                                    .foregroundStyle(.orange)
+                                                    .lineLimit(1)
+                                            } else if let refreshedAt = subscription.lastRefreshAt {
+                                                Text("Updated \(refreshedAt.formatted(date: .omitted, time: .shortened))")
+                                                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+                                    }
+
+                                    Button(role: .destructive) {
+                                        appState.removeICalSubscription(id: subscription.id)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .font(.system(size: 12, weight: .semibold))
+                                    }
+                                    .buttonStyle(.borderless)
+                                }
+                                .padding(10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(Color.white.opacity(0.04))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Text("Subscriptions sync across iPhone and Mac via your shared folder sync.")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -798,7 +899,7 @@ struct SettingsView: View {
 private enum SettingsCategory: String, CaseIterable, Identifiable {
     case general
     case ai
-    case music
+    case calendar
     case focus
     case habits
     case tasks
@@ -811,7 +912,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "General"
         case .ai: return "AI"
-        case .music: return "Music"
+        case .calendar: return "Calendar"
         case .focus: return "Focus"
         case .habits: return "Habits"
         case .tasks: return "Tasks"
@@ -824,7 +925,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "Appearance and export"
         case .ai: return "Coach and model setup"
-        case .music: return "Playback polling"
+        case .calendar: return "Sources and subscriptions"
         case .focus: return "Pomodoro behavior"
         case .habits: return "Weekly habits options"
         case .tasks: return "Board defaults and archive"
@@ -837,7 +938,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "gearshape"
         case .ai: return "sparkles"
-        case .music: return "music.note"
+        case .calendar: return "calendar"
         case .focus: return "timer"
         case .habits: return "flame"
         case .tasks: return "checkmark.circle"

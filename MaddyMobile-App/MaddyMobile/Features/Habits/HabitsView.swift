@@ -14,13 +14,16 @@ struct HabitsView: View {
     @State private var editorHabit: Habit?
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
+        List {
+            Section {
                 GlassCard(title: "Today", accent: settings.accentColor) {
                     Text("Progress: \(habitsStore.todayProgressText)")
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
                         .foregroundStyle(AppTheme.textPrimary)
                 }
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
 
                 GlassCard(title: "Year Heatmap", accent: settings.accentColor) {
                     YearHeatmapView(
@@ -29,27 +32,47 @@ struct HabitsView: View {
                         tint: settings.accentColor
                     )
                 }
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            }
 
-                VStack(spacing: 10) {
-                    ForEach(habitsStore.habits) { habit in
-                        HabitRowView(habit: habit, accent: settings.accentColor) {
-                            habitsStore.markCompleted(id: habit.id)
-                        } onEdit: {
-                            editorHabit = habit
-                        }
+            Section {
+                ForEach(habitsStore.habits) { habit in
+                    let isCompletedToday = isHabitCompletedToday(habit)
+                    HabitRowView(habit: habit, accent: settings.accentColor, isCompletedToday: isCompletedToday) {
+                        habitsStore.markCompleted(id: habit.id)
+                    } onEdit: {
+                        editorHabit = habit
                     }
-
-                    if habitsStore.habits.isEmpty {
-                        GlassCard(accent: settings.accentColor) {
-                            Text("No habits yet")
-                                .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .foregroundStyle(AppTheme.textSecondary)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        Button {
+                            habitsStore.markCompleted(id: habit.id)
+                        } label: {
+                            Label("Complete", systemImage: "checkmark.circle.fill")
                         }
+                        .tint(.green)
+                        .disabled(isCompletedToday)
                     }
                 }
+
+                if habitsStore.habits.isEmpty {
+                    GlassCard(accent: settings.accentColor) {
+                        Text("No habits yet")
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundStyle(AppTheme.textSecondary)
+                    }
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                }
             }
-            .padding(16)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .background(AppTheme.background.ignoresSafeArea())
         .navigationTitle("Habits")
         .toolbar {
@@ -71,6 +94,11 @@ struct HabitsView: View {
             .preferredColorScheme(.dark)
         }
     }
+
+    private func isHabitCompletedToday(_ habit: Habit, now: Date = Date()) -> Bool {
+        let key = HabitStore.dayKey(now)
+        return (habit.history[key] ?? 0) >= habit.targetValue
+    }
 }
 
 // =====================================================
@@ -81,6 +109,7 @@ struct HabitsView: View {
 private struct HabitRowView: View {
     let habit: Habit
     let accent: Color
+    let isCompletedToday: Bool
     let onComplete: () -> Void
     let onEdit: () -> Void
 
@@ -100,7 +129,7 @@ private struct HabitRowView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: pulse ? "checkmark.circle.fill" : habit.symbol)
+                    Image(systemName: pulse || isCompletedToday ? "checkmark.circle.fill" : habit.symbol)
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(Color(hex: habit.colorHex) ?? accent)
                         .scaleEffect(pulse ? 1.22 : 1.0)
@@ -112,7 +141,7 @@ private struct HabitRowView: View {
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .foregroundStyle(AppTheme.textPrimary)
 
-                    Text("Streak: \(habit.streak)  •  Target: \(habit.targetValue)")
+                    Text(isCompletedToday ? "Completed today  •  Streak: \(habit.streak)" : "Streak: \(habit.streak)  •  Target: \(habit.targetValue)")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(AppTheme.textSecondary)
                 }

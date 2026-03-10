@@ -14,16 +14,20 @@ struct RadarChartView: View {
             let size = min(geo.size.width, geo.size.height)
             let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
             let radius = size * 0.36
+            let axisCount = max(3, SkillCategory.allCases.count)
+            let values = normalizedSkillValues()
 
             ZStack {
                 ForEach(1..<5, id: \.self) { step in
-                    RadarPolygon(
-                        points: normalizedPoints(values: Array(repeating: Double(step) / 4.0, count: 6), center: center, radius: radius)
-                    )
+                    RadarPolygon(points: normalizedPoints(
+                        values: Array(repeating: Double(step) / 4.0, count: axisCount),
+                        center: center,
+                        radius: radius
+                    ))
                     .stroke(Color.white.opacity(0.14), lineWidth: 1)
                 }
 
-                ForEach(0..<6, id: \.self) { index in
+                ForEach(0..<axisCount, id: \.self) { index in
                     let point = axisPoint(index: index, center: center, radius: radius)
                     Path { path in
                         path.move(to: center)
@@ -32,10 +36,10 @@ struct RadarChartView: View {
                     .stroke(Color.white.opacity(0.12), lineWidth: 1)
                 }
 
-                RadarPolygon(points: normalizedPoints(values: normalizedSkillValues(), center: center, radius: radius))
+                RadarPolygon(points: normalizedPoints(values: values, center: center, radius: radius))
                     .fill(accent.opacity(0.28))
 
-                RadarPolygon(points: normalizedPoints(values: normalizedSkillValues(), center: center, radius: radius))
+                RadarPolygon(points: normalizedPoints(values: values, center: center, radius: radius))
                     .stroke(accent, lineWidth: 2)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -44,7 +48,7 @@ struct RadarChartView: View {
 
     private func normalizedSkillValues() -> [Double] {
         SkillCategory.allCases.map { category in
-            Double(skills[category]) / 100.0
+            min(1.0, Double(skills[category].level) / 20.0)
         }
     }
 
@@ -72,7 +76,7 @@ struct RadarChartView: View {
     }
 
     private func angleForAxis(index: Int) -> Double {
-        let step = (2.0 * Double.pi) / 6.0
+        let step = (2.0 * Double.pi) / Double(max(3, SkillCategory.allCases.count))
         return (-Double.pi / 2.0) + (Double(index) * step)
     }
 }

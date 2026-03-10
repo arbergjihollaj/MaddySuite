@@ -12,12 +12,10 @@
 		18707DF02F574FFA006ACFA4 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18707DEF2F574FF6006ACFA4 /* AppState.swift */; };
 		18707DF22F57500C006ACFA4 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18707DF12F575009006ACFA4 /* RootView.swift */; };
 		18707DF62F57520F006ACFA4 /* SerialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18707DF32F57501A006ACFA4 /* SerialService.swift */; };
-		18707DF72F575216006ACFA4 /* MusicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18707DF42F57502A006ACFA4 /* MusicService.swift */; };
 		A10000000000000000000012 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18707DF52F57504E006ACFA4 /* HomeView.swift */; };
 		A10000000000000000000013 /* Focus/FocusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* Focus/FocusView.swift */; };
 		A10000000000000000000014 /* Tasks/TasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* Tasks/TasksView.swift */; };
 		A10000000000000000000015 /* Habits/HabitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* Habits/HabitsView.swift */; };
-		A10000000000000000000016 /* Music/MusicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* Music/MusicView.swift */; };
 		A10000000000000000000017 /* Settings/SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000006 /* Settings/SettingsView.swift */; };
 		A10000000000000000000018 /* Shared/SharedUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000007 /* Shared/SharedUI.swift */; };
 		A10000000000000000000019 /* Services/GamificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000008 /* Services/GamificationService.swift */; };
@@ -56,12 +54,10 @@
 		18707DEF2F574FF6006ACFA4 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		18707DF12F575009006ACFA4 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		18707DF32F57501A006ACFA4 /* SerialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SerialService.swift; sourceTree = "<group>"; };
-		18707DF42F57502A006ACFA4 /* MusicService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicService.swift; sourceTree = "<group>"; };
 		18707DF52F57504E006ACFA4 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		A10000000000000000000002 /* Focus/FocusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Focus/FocusView.swift; sourceTree = "<group>"; };
 		A10000000000000000000003 /* Tasks/TasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tasks/TasksView.swift; sourceTree = "<group>"; };
 		A10000000000000000000004 /* Habits/HabitsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Habits/HabitsView.swift; sourceTree = "<group>"; };
-		A10000000000000000000005 /* Music/MusicView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Music/MusicView.swift; sourceTree = "<group>"; };
 		A10000000000000000000006 /* Settings/SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings/SettingsView.swift; sourceTree = "<group>"; };
 		A10000000000000000000007 /* Shared/SharedUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/SharedUI.swift; sourceTree = "<group>"; };
 		A10000000000000000000008 /* Services/GamificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamificationService.swift; sourceTree = "<group>"; };
@@ -158,7 +154,6 @@
 				A10000000000000000000008 /* Services/GamificationService.swift */,
 				E50000000000000000000011 /* Services/StatisticsExportService.swift */,
 				F61000000000000000000011 /* Services/FileShelfStore.swift */,
-				18707DF42F57502A006ACFA4 /* MusicService.swift */,
 				18707DF32F57501A006ACFA4 /* SerialService.swift */,
 			);
 			path = Services;
@@ -181,7 +176,6 @@
 				A10000000000000000000003 /* Tasks/TasksView.swift */,
 				D40000000000000000000011 /* Features/Tasks/TaskEditorSheet.swift */,
 				A10000000000000000000004 /* Habits/HabitsView.swift */,
-				A10000000000000000000005 /* Music/MusicView.swift */,
 				A10000000000000000000006 /* Settings/SettingsView.swift */,
 				B2000000000000000000001C /* Features/Settings/AISettingsView.swift */,
 				F61000000000000000000012 /* Features/FileShelf/FileShelfPanelView.swift */,
@@ -271,7 +265,6 @@
 				A10000000000000000000013 /* Focus/FocusView.swift in Sources */,
 				A10000000000000000000014 /* Tasks/TasksView.swift in Sources */,
 				A10000000000000000000015 /* Habits/HabitsView.swift in Sources */,
-				A10000000000000000000016 /* Music/MusicView.swift in Sources */,
 				A10000000000000000000017 /* Settings/SettingsView.swift in Sources */,
 				A10000000000000000000018 /* Shared/SharedUI.swift in Sources */,
 				A10000000000000000000019 /* Services/GamificationService.swift in Sources */,
@@ -297,7 +290,6 @@
 				B20000000000000000000001 /* Services/AI/AIModels.swift in Sources */,
 				B20000000000000000000002 /* Services/AI/AIError.swift in Sources */,
 				B20000000000000000000003 /* Services/AI/AIStorage.swift in Sources */,
-				18707DF72F575216006ACFA4 /* MusicService.swift in Sources */,
 				18707DEE2F574FE7006ACFA4 /* AppRoute.swift in Sources */,
 				18707DF62F57520F006ACFA4 /* SerialService.swift in Sources */,
 				18707DF02F574FFA006ACFA4 /* AppState.swift in Sources */,
@@ -446,7 +438,6 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "MaddyV2 needs access to read and control Apple Music.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -479,7 +470,6 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "MaddyV2 needs access to read and control Apple Music.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

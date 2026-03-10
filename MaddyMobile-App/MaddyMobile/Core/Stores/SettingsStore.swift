@@ -6,23 +6,86 @@ import SwiftUI
 // [TAG: MOBILE_SETTINGS_STORE]
 // =====================================================
 
+enum MobileTab: String, CaseIterable, Codable, Hashable, Identifiable {
+    case home
+    case focus
+    case tasks
+    case habits
+    case more
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .home: return "Home"
+        case .focus: return "Focus"
+        case .tasks: return "Tasks"
+        case .habits: return "Habits"
+        case .more: return "More"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .home: return "house"
+        case .focus: return "timer"
+        case .tasks: return "checklist"
+        case .habits: return "flame"
+        case .more: return "ellipsis.circle"
+        }
+    }
+
+    var isAlwaysVisible: Bool {
+        self == .home || self == .more
+    }
+
+    static var orderedCases: [MobileTab] {
+        [.home, .focus, .tasks, .habits, .more]
+    }
+
+    static var customizableCases: [MobileTab] {
+        orderedCases.filter { $0.isAlwaysVisible == false }
+    }
+}
+
 @MainActor
 final class SettingsStore: ObservableObject {
     struct State: Codable {
         var accentHex: String
         var soundEnabled: Bool
         var exportPlaceholderEnabled: Bool
+        var dailyTaskCount: Int?
+        var dailySummaryEnabled: Bool?
         var iCloudSyncEnabled: Bool
         var syncFolderBookmark: Data?
         var syncFolderDisplayName: String?
         var lastSuccessfulSyncAt: Date?
         var lastModifiedAt: Date?
+        var showGoogleCalendarEvents: Bool?
+        var showICalCalendarEvents: Bool?
+        var showTaskCalendarEntries: Bool?
+        var iCalSubscriptions: [ICalSubscription]?
+        var visibleTabRawValues: [String]?
     }
 
     struct CloudSnapshot: Codable {
         var accentHex: String
         var soundEnabled: Bool
         var exportPlaceholderEnabled: Bool
+        var dailyTaskCount: Int?
+        var dailySummaryEnabled: Bool?
+        var modifiedAt: Date
+        var showGoogleCalendarEvents: Bool?
+        var showICalCalendarEvents: Bool?
+        var showTaskCalendarEntries: Bool?
+        var visibleTabRawValues: [String]?
+    }
+
+    struct CalendarSyncSnapshot: Codable {
+        var iCalSubscriptions: [ICalSubscription]
+        var showGoogleCalendarEvents: Bool
+        var showICalCalendarEvents: Bool
+        var showTaskCalendarEntries: Bool
         var modifiedAt: Date
     }
 
@@ -44,11 +107,51 @@ final class SettingsStore: ObservableObject {
         didSet { handleSyncedPreferenceMutation() }
     }
 
+    @Published var dailyTaskCount: Int {
+        didSet {
+            guard isApplyingCloudSnapshot == false else { return }
+            dailyTaskCount = min(8, max(1, dailyTaskCount))
+            handleSyncedPreferenceMutation()
+        }
+    }
+
+    @Published var dailySummaryEnabled: Bool {
+        didSet { handleSyncedPreferenceMutation() }
+    }
+
     @Published var iCloudSyncEnabled: Bool {
         didSet {
             guard isApplyingCloudSnapshot == false else { return }
             persist()
             onICloudSyncPreferenceChanged?(iCloudSyncEnabled)
+        }
+    }
+
+    @Published var showGoogleCalendarEvents: Bool {
+        didSet { handleSyncedPreferenceMutation() }
+    }
+
+    @Published var showICalCalendarEvents: Bool {
+        didSet { handleSyncedPreferenceMutation() }
+    }
+
+    @Published var showTaskCalendarEntries: Bool {
+        didSet { handleSyncedPreferenceMutation() }
+    }
+
+    @Published var iCalSubscriptions: [ICalSubscription] {
+        didSet { handleSyncedPreferenceMutation() }
+    }
+
+    @Published private var visibleTabRawValues: [String] {
+        didSet {
+            guard isApplyingCloudSnapshot == false else { return }
+            let normalized = Self.normalizedVisibleTabRawValues(visibleTabRawValues)
+            if normalized != visibleTabRawValues {
+                visibleTabRawValues = normalized
+                return
+            }
+            handleSyncedPreferenceMutation()
         }
     }
 
@@ -74,29 +177,54 @@ final class SettingsStore: ObservableObject {
             accentHex = loaded.accentHex
             soundEnabled = loaded.soundEnabled
             exportPlaceholderEnabled = loaded.exportPlaceholderEnabled
+            dailyTaskCount = min(8, max(1, loaded.dailyTaskCount ?? 3))
+            dailySummaryEnabled = loaded.dailySummaryEnabled ?? true
             iCloudSyncEnabled = loaded.iCloudSyncEnabled
             syncFolderBookmark = loaded.syncFolderBookmark
             syncFolderDisplayName = loaded.syncFolderDisplayName
             lastSuccessfulSyncAt = loaded.lastSuccessfulSyncAt
             lastModifiedAt = loaded.lastModifiedAt ?? defaultModifiedAt
+            showGoogleCalendarEvents = loaded.showGoogleCalendarEvents ?? true
+            showICalCalendarEvents = loaded.showICalCalendarEvents ?? true
+            showTaskCalendarEntries = loaded.showTaskCalendarEntries ?? true
+            iCalSubscriptions = loaded.iCalSubscriptions ?? []
+            visibleTabRawValues = Self.normalizedVisibleTabRawValues(loaded.visibleTabRawValues ?? MobileTab.orderedCases.map(\.rawValue))
         } else if let legacy = storage.loadIfPresent(LegacyState.self, from: fileName) {
             accentHex = legacy.accentHex
             soundEnabled = legacy.soundEnabled
             exportPlaceholderEnabled = legacy.exportPlaceholderEnabled
-            iCloudSyncEnabled = false
+            dailyTaskCount = 3
+            dailySummaryEnabled = true
+            iCloudSyncEnabled = true
             syncFolderBookmark = nil
             syncFolderDisplayName = nil
             lastSuccessfulSyncAt = nil
             lastModifiedAt = defaultModifiedAt
+            showGoogleCalendarEvents = true
+            showICalCalendarEvents = true
+            showTaskCalendarEntries = true
+            iCalSubscriptions = []
+            visibleTabRawValues = MobileTab.orderedCases.map(\.rawValue)
         } else {
             accentHex = "#FF7A2F"
             soundEnabled = true
             exportPlaceholderEnabled = false
-            iCloudSyncEnabled = false
+            dailyTaskCount = 3
+            dailySummaryEnabled = true
+            iCloudSyncEnabled = true
             syncFolderBookmark = nil
             syncFolderDisplayName = nil
             lastSuccessfulSyncAt = nil
             lastModifiedAt = defaultModifiedAt
+            showGoogleCalendarEvents = true
+            showICalCalendarEvents = true
+            showTaskCalendarEntries = true
+            iCalSubscriptions = []
+            visibleTabRawValues = MobileTab.orderedCases.map(\.rawValue)
+        }
+
+        if syncFolderBookmark != nil, iCloudSyncEnabled == false {
+            iCloudSyncEnabled = true
         }
 
         persist()
@@ -106,12 +234,40 @@ final class SettingsStore: ObservableObject {
         Color(hex: accentHex) ?? Color.orange
     }
 
+    var visibleTabs: [MobileTab] {
+        let allowed = Set(visibleTabRawValues.compactMap(MobileTab.init(rawValue:)))
+        return MobileTab.orderedCases.filter { tab in
+            tab.isAlwaysVisible || allowed.contains(tab)
+        }
+    }
+
+    func isTabVisible(_ tab: MobileTab) -> Bool {
+        visibleTabs.contains(tab)
+    }
+
+    func setTabVisibility(_ tab: MobileTab, isVisible: Bool) {
+        guard tab.isAlwaysVisible == false else { return }
+        var set = Set(visibleTabRawValues)
+        if isVisible {
+            set.insert(tab.rawValue)
+        } else {
+            set.remove(tab.rawValue)
+        }
+        visibleTabRawValues = Self.normalizedVisibleTabRawValues(Array(set))
+    }
+
     func cloudSnapshot() -> CloudSnapshot {
         CloudSnapshot(
             accentHex: accentHex,
             soundEnabled: soundEnabled,
             exportPlaceholderEnabled: exportPlaceholderEnabled,
-            modifiedAt: lastModifiedAt
+            dailyTaskCount: dailyTaskCount,
+            dailySummaryEnabled: dailySummaryEnabled,
+            modifiedAt: lastModifiedAt,
+            showGoogleCalendarEvents: showGoogleCalendarEvents,
+            showICalCalendarEvents: showICalCalendarEvents,
+            showTaskCalendarEntries: showTaskCalendarEntries,
+            visibleTabRawValues: visibleTabRawValues
         )
     }
 
@@ -122,6 +278,35 @@ final class SettingsStore: ObservableObject {
         accentHex = snapshot.accentHex
         soundEnabled = snapshot.soundEnabled
         exportPlaceholderEnabled = snapshot.exportPlaceholderEnabled
+        dailyTaskCount = min(8, max(1, snapshot.dailyTaskCount ?? dailyTaskCount))
+        dailySummaryEnabled = snapshot.dailySummaryEnabled ?? dailySummaryEnabled
+        showGoogleCalendarEvents = snapshot.showGoogleCalendarEvents ?? showGoogleCalendarEvents
+        showICalCalendarEvents = snapshot.showICalCalendarEvents ?? showICalCalendarEvents
+        showTaskCalendarEntries = snapshot.showTaskCalendarEntries ?? showTaskCalendarEntries
+        visibleTabRawValues = Self.normalizedVisibleTabRawValues(snapshot.visibleTabRawValues ?? visibleTabRawValues)
+        lastModifiedAt = snapshot.modifiedAt
+        isApplyingCloudSnapshot = false
+        persist()
+    }
+
+    func calendarSyncSnapshot() -> CalendarSyncSnapshot {
+        CalendarSyncSnapshot(
+            iCalSubscriptions: iCalSubscriptions,
+            showGoogleCalendarEvents: showGoogleCalendarEvents,
+            showICalCalendarEvents: showICalCalendarEvents,
+            showTaskCalendarEntries: showTaskCalendarEntries,
+            modifiedAt: lastModifiedAt
+        )
+    }
+
+    func applyCalendarSyncSnapshot(_ snapshot: CalendarSyncSnapshot) {
+        guard snapshot.modifiedAt > lastModifiedAt else { return }
+
+        isApplyingCloudSnapshot = true
+        iCalSubscriptions = snapshot.iCalSubscriptions
+        showGoogleCalendarEvents = snapshot.showGoogleCalendarEvents
+        showICalCalendarEvents = snapshot.showICalCalendarEvents
+        showTaskCalendarEntries = snapshot.showTaskCalendarEntries
         lastModifiedAt = snapshot.modifiedAt
         isApplyingCloudSnapshot = false
         persist()
@@ -138,6 +323,13 @@ final class SettingsStore: ObservableObject {
 
     @discardableResult
     func updateSyncFolder(url: URL) -> Bool {
+        let hasSecurityScope = url.startAccessingSecurityScopedResource()
+        defer {
+            if hasSecurityScope {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
         do {
             let bookmark = try url.bookmarkData(
                 options: .minimalBookmark,
@@ -150,6 +342,7 @@ final class SettingsStore: ObservableObject {
             onDataChanged?()
             return true
         } catch {
+            print("[TAG: MOBILE_SYNC_FOLDER_SAVE_FAIL] \(error.localizedDescription)")
             return false
         }
     }
@@ -185,11 +378,66 @@ final class SettingsStore: ObservableObject {
         return url
     }
 
+    // =====================================================
+    // MARK: - Calendar Preferences
+    // [TAG: MOBILE_CALENDAR_SETTINGS]
+    // =====================================================
+
+    @discardableResult
+    func addICalSubscription(urlString: String, name: String? = nil) -> Bool {
+        let normalized = normalizeSubscriptionURL(urlString)
+        guard normalized.isEmpty == false,
+              URL(string: normalized) != nil else {
+            return false
+        }
+
+        if iCalSubscriptions.contains(where: { $0.urlString.caseInsensitiveCompare(normalized) == .orderedSame }) {
+            return false
+        }
+
+        iCalSubscriptions.append(ICalSubscription.make(urlString: normalized, name: name))
+        return true
+    }
+
+    func removeICalSubscription(id: UUID) {
+        iCalSubscriptions.removeAll { $0.id == id }
+    }
+
+    func updateICalSubscriptionEnabled(id: UUID, isEnabled: Bool) {
+        guard let index = iCalSubscriptions.firstIndex(where: { $0.id == id }) else { return }
+        iCalSubscriptions[index].isEnabled = isEnabled
+    }
+
+    func updateICalRefreshMetadata(id: UUID, refreshedAt: Date?, error: String?) {
+        guard let index = iCalSubscriptions.firstIndex(where: { $0.id == id }) else { return }
+        iCalSubscriptions[index].lastRefreshAt = refreshedAt ?? iCalSubscriptions[index].lastRefreshAt
+        iCalSubscriptions[index].lastError = error
+    }
+
+    private func normalizeSubscriptionURL(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return "" }
+        if trimmed.lowercased().hasPrefix("webcal://") {
+            return "https://" + trimmed.dropFirst("webcal://".count)
+        }
+        return trimmed
+    }
+
     private func handleSyncedPreferenceMutation() {
         guard isApplyingCloudSnapshot == false else { return }
         lastModifiedAt = Date()
         persist()
         onDataChanged?()
+    }
+
+    private static func normalizedVisibleTabRawValues(_ values: [String]) -> [String] {
+        var allowed = Set(values)
+        for required in MobileTab.orderedCases where required.isAlwaysVisible {
+            allowed.insert(required.rawValue)
+        }
+        return MobileTab.orderedCases
+            .map(\.rawValue)
+            .filter { allowed.contains($0) }
     }
 
     private func persist() {
@@ -198,11 +446,18 @@ final class SettingsStore: ObservableObject {
                 accentHex: accentHex,
                 soundEnabled: soundEnabled,
                 exportPlaceholderEnabled: exportPlaceholderEnabled,
+                dailyTaskCount: dailyTaskCount,
+                dailySummaryEnabled: dailySummaryEnabled,
                 iCloudSyncEnabled: iCloudSyncEnabled,
                 syncFolderBookmark: syncFolderBookmark,
                 syncFolderDisplayName: syncFolderDisplayName,
                 lastSuccessfulSyncAt: lastSuccessfulSyncAt,
-                lastModifiedAt: lastModifiedAt
+                lastModifiedAt: lastModifiedAt,
+                showGoogleCalendarEvents: showGoogleCalendarEvents,
+                showICalCalendarEvents: showICalCalendarEvents,
+                showTaskCalendarEntries: showTaskCalendarEntries,
+                iCalSubscriptions: iCalSubscriptions,
+                visibleTabRawValues: visibleTabRawValues
             ),
             to: fileName
         )

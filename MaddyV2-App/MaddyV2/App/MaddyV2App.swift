@@ -10,18 +10,15 @@ import SwiftUI
 @main
 struct MaddyV2App: App {
     @StateObject private var serialService: SerialService
-    @StateObject private var musicService: MusicService
     @StateObject private var appState: AppState
     @StateObject private var fileShelfStore: FileShelfStore
 
     init() {
         let serial = SerialService()
-        let music = MusicService()
         let shelf = FileShelfStore()
 
         _serialService = StateObject(wrappedValue: serial)
-        _musicService = StateObject(wrappedValue: music)
-        _appState = StateObject(wrappedValue: AppState(serialService: serial, musicService: music))
+        _appState = StateObject(wrappedValue: AppState(serialService: serial))
         _fileShelfStore = StateObject(wrappedValue: shelf)
     }
 
@@ -30,7 +27,6 @@ struct MaddyV2App: App {
             RootView()
                 .environmentObject(appState)
                 .environmentObject(serialService)
-                .environmentObject(musicService)
                 .environmentObject(fileShelfStore)
                 .preferredColorScheme(.dark)
         }
@@ -51,7 +47,6 @@ struct MaddyV2App: App {
                 MenuBarPanelView()
                     .environmentObject(appState)
                     .environmentObject(serialService)
-                    .environmentObject(musicService)
                     .environmentObject(fileShelfStore)
                     .frame(width: 320)
                     .padding(12)
@@ -71,7 +66,6 @@ struct MaddyV2App: App {
             SettingsView()
                 .environmentObject(appState)
                 .environmentObject(serialService)
-                .environmentObject(musicService)
                 .environmentObject(fileShelfStore)
                 .frame(width: 900, height: 680)
         }
@@ -86,7 +80,6 @@ struct MaddyV2App: App {
 private struct MenuBarPanelView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var serialService: SerialService
-    @EnvironmentObject var musicService: MusicService
     @EnvironmentObject var fileShelfStore: FileShelfStore
     @Environment(\.openWindow) private var openWindow
 
@@ -104,43 +97,13 @@ private struct MenuBarPanelView: View {
             }
 
             HStack(spacing: 8) {
-                ForEach([AppRoute.home, .focus, .tasks, .music]) { route in
+                ForEach([AppRoute.home, .focus, .tasks, .habits]) { route in
                     Button(route.title) {
                         appState.navigate(to: route)
                     }
                     .buttonStyle(.bordered)
                 }
             }
-
-            Divider()
-
-            Text(musicService.snapshot.title.isEmpty ? "No track" : musicService.snapshot.title)
-                .lineLimit(1)
-            Text(musicService.snapshot.artist)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-
-            HStack {
-                Button {
-                    musicService.previousTrack()
-                } label: {
-                    Image(systemName: "backward.fill")
-                }
-
-                Button {
-                    musicService.togglePlayPause()
-                } label: {
-                    Image(systemName: musicService.snapshot.state == .playing ? "pause.fill" : "play.fill")
-                }
-
-                Button {
-                    musicService.nextTrack()
-                } label: {
-                    Image(systemName: "forward.fill")
-                }
-            }
-            .buttonStyle(.bordered)
 
             Divider()
 

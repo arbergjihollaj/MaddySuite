@@ -15,7 +15,6 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var serialService: SerialService
-    @EnvironmentObject var musicService: MusicService
     @EnvironmentObject var fileShelfStore: FileShelfStore
     @Environment(\.openWindow) private var openWindow
     @State private var isExportingExcel = false
@@ -38,7 +37,7 @@ struct HomeView: View {
                 quickRouteButton(.focus)
                 quickRouteButton(.tasks)
                 quickRouteButton(.habits)
-                quickRouteButton(.music)
+                quickRouteButton(.gamify)
             }
         }
     }
@@ -271,18 +270,6 @@ struct HomeView: View {
                 let weeklyScore = appState.habitsViewModel.weeklyCompletionCount()
                 Text("Weekly completion score: \(weeklyScore)")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-            }
-        case .music:
-            GlassCard(title: "Music", accent: appState.accentColor) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(musicService.snapshot.title.isEmpty ? "No current track" : musicService.snapshot.title)
-                        .lineLimit(1)
-                    Text(musicService.snapshot.artist)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    ProgressView(value: musicService.snapshot.progress)
-                        .tint(appState.accentColor)
-                }
             }
         case .serial:
             GlassCard(title: "Serial", accent: appState.accentColor) {

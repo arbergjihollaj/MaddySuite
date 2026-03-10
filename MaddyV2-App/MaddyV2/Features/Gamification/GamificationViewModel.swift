@@ -20,6 +20,7 @@ final class GamificationViewModel: ObservableObject {
         let title: String
         let level: Int
         let xpInLevel: Int
+        let xpToNext: Int
         let progress0to1: Double
         let normalized0to1: Double
         let color: Color
@@ -28,33 +29,42 @@ final class GamificationViewModel: ObservableObject {
     }
 
     struct ChallengeRow: Identifiable {
-        let id: String
+        let id: UUID
         let title: String
         let description: String
         let progress: Int
         let target: Int
         let rewardXP: Int
+        let cadence: GamificationChallengeCadence
         let completed: Bool
     }
 
     struct AchievementRow: Identifiable {
-        let achievement: GamificationAchievement
-        let unlockedAt: Date?
-
-        var id: String { achievement.rawValue }
-        var title: String { achievement.title }
-        var description: String { achievement.description }
-        var unlocked: Bool { unlockedAt != nil }
+        let id: UUID
+        let title: String
+        let description: String
+        let icon: String
+        let unlockedAt: Date
     }
 
     @Published private(set) var levelTitle: String = "Level 1"
     @Published private(set) var xpSubtitle: String = "0 / 100 XP"
     @Published private(set) var progress0to1: Double = 0
-    @Published private(set) var skillPoints: Int = 0
+
+    @Published private(set) var momentumText: String = "Momentum 50"
+    @Published private(set) var specializationText: String = "None"
+    @Published private(set) var specializationSummaryText: String = "No specialization selected"
+    @Published private(set) var weeklyGoalText: String = "Weekly Goal 0/5"
+    @Published private(set) var seasonTitle: String = "Season"
+    @Published private(set) var seasonSubtitle: String = "Season XP 0"
+    @Published private(set) var resetDayText: String = "Reset Day inactive"
+    @Published private(set) var recoveryText: String = "No active recovery challenge"
 
     @Published private(set) var radarAxes: [RadarHexChart.AxisValue] = []
     @Published private(set) var skillRows: [SkillRow] = []
-    @Published private(set) var challenges: [ChallengeRow] = []
+    @Published private(set) var dailyChallenges: [ChallengeRow] = []
+    @Published private(set) var weeklyChallenges: [ChallengeRow] = []
+    @Published private(set) var seasonalChallenges: [ChallengeRow] = []
     @Published private(set) var achievements: [AchievementRow] = []
 
     @Published private(set) var celebrationToken: Int = 0
@@ -76,11 +86,6 @@ final class GamificationViewModel: ObservableObject {
         refresh()
     }
 
-    func spendSkillPoint(on axis: GamificationSkillAxis) {
-        guard service.spendSkillPoint(on: axis) else { return }
-        refresh()
-    }
-
     private func bind() {
         service.objectWillChange
             .receive(on: DispatchQueue.main)
@@ -99,9 +104,19 @@ final class GamificationViewModel: ObservableObject {
 
     private func refresh() {
         levelTitle = "Level \(service.currentLevel)"
-        xpSubtitle = "\(service.xpInLevel) / 100 XP"
+        xpSubtitle = "\(service.xpInLevel) / \(service.xpToNextLevel) XP"
         progress0to1 = service.progress0to1
-        skillPoints = service.skillPoints
+
+        momentumText = "Momentum \(service.momentum)"
+        specializationText = service.specialization.selection.title
+        specializationSummaryText = service.specialization.selection.summary
+        weeklyGoalText = "Weekly Goal \(service.weeklyGoal.completedDailyCompletions)/\(service.weeklyGoal.requiredDailyCompletions)"
+        seasonTitle = service.season.title
+        seasonSubtitle = "Season XP \(service.season.seasonalXP) • Perfect Days \(service.season.stats.perfectDays)"
+        resetDayText = service.resetDayChallenge.isActive
+            ? "Reset challenge: Focus \(service.resetDayChallenge.focusProgress)/\(service.resetDayChallenge.focusTarget), Tasks \(service.resetDayChallenge.taskProgress)/\(service.resetDayChallenge.taskTarget), Habits \(service.resetDayChallenge.habitProgress)/\(service.resetDayChallenge.habitTarget)"
+            : "Reset Day inactive"
+        recoveryText = service.recoveryChallenge.map { "\($0.title): \($0.detail)" } ?? "No active recovery challenge"
 
         let rows = GamificationSkillAxis.allCases.enumerated().map { index, axis in
             let state = service.skills[axis] ?? GamificationSkillState()
@@ -111,6 +126,7 @@ final class GamificationViewModel: ObservableObject {
                 title: axis.title,
                 level: state.skillLevel,
                 xpInLevel: state.skillXP,
+                xpToNext: state.xpToNextLevel,
                 progress0to1: state.skillProgress0to1,
                 normalized0to1: state.normalized0to1,
                 color: color
@@ -128,25 +144,58 @@ final class GamificationViewModel: ObservableObject {
             )
         }
 
-        challenges = service.dailyChallenges.map {
+        dailyChallenges = service.dailyChallenges.map {
             ChallengeRow(
                 id: $0.id,
                 title: $0.title,
-                description: $0.description,
+                description: $0.detail,
                 progress: $0.progress,
                 target: $0.target,
                 rewardXP: $0.rewardXP,
+                cadence: $0.cadence,
                 completed: $0.completed
             )
         }
 
-        achievements = GamificationAchievement.allCases.map {
-            AchievementRow(achievement: $0, unlockedAt: service.unlockedAt(for: $0))
+        weeklyChallenges = service.weeklyChallenges.map {
+            ChallengeRow(
+                id: $0.id,
+                title: $0.title,
+                description: $0.detail,
+                progress: $0.progress,
+                target: $0.target,
+                rewardXP: $0.rewardXP,
+                cadence: $0.cadence,
+                completed: $0.completed
+            )
+        }
+
+        seasonalChallenges = service.seasonalChallenges.map {
+            ChallengeRow(
+                id: $0.id,
+                title: $0.title,
+                description: $0.detail,
+                progress: $0.progress,
+                target: $0.target,
+                rewardXP: $0.rewardXP,
+                cadence: $0.cadence,
+                completed: $0.completed
+            )
+        }
+
+        achievements = service.achievements.map {
+            AchievementRow(
+                id: $0.id,
+                title: $0.title,
+                description: $0.detail,
+                icon: $0.icon,
+                unlockedAt: $0.unlockedAt
+            )
         }
     }
 
     private func tone(for index: Int) -> Color {
-        let steps: [Double] = [0.98, 0.88, 0.78, 0.68, 0.58, 0.48]
+        let steps: [Double] = [0.98, 0.88, 0.78, 0.68]
         let opacity = steps[safe: index] ?? 0.75
         return accent.opacity(opacity)
     }

@@ -20,6 +20,7 @@ struct MaddyMobileApp: App {
                 .environmentObject(appModel.habitStore)
                 .environmentObject(appModel.focusStore)
                 .environmentObject(appModel.gamificationStore)
+                .environmentObject(appModel.calendarStore)
                 .preferredColorScheme(.dark)
         }
     }

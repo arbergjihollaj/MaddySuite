@@ -13,10 +13,9 @@ import SwiftUI
 // =====================================================
 
 struct GamificationView: View {
+    @EnvironmentObject private var appState: AppState
     @ObservedObject var viewModel: GamificationViewModel
     let accent: Color
-
-    @State private var confirmAxis: GamificationSkillAxis?
 
     var body: some View {
         ScrollView {
@@ -24,8 +23,9 @@ struct GamificationView: View {
                 headerCard
                 profileCard
                 challengesCard
+                seasonCard
+                recoveryCard
                 achievementsCard
-                upgradesCard
             }
             .padding(.bottom, 12)
         }
@@ -43,23 +43,28 @@ struct GamificationView: View {
 
                     Spacer(minLength: 0)
 
-                    HStack(spacing: 6) {
-                        Image(systemName: "sparkles")
-                        Text("\(viewModel.skillPoints) SP")
-                    }
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(accent)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.08)))
+                    Text(viewModel.momentumText)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(accent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.08)))
                 }
 
                 ProgressView(value: viewModel.progress0to1)
                     .tint(accent)
                     .scaleEffect(x: 1, y: 1.2, anchor: .center)
 
-                Text(viewModel.xpSubtitle)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                HStack {
+                    Text(viewModel.xpSubtitle)
+                    Spacer(minLength: 0)
+                    Text(viewModel.specializationText)
+                }
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
+
+                Text(viewModel.specializationSummaryText)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
             }
             .animation(.easeInOut(duration: 0.22), value: viewModel.progress0to1)
@@ -67,271 +72,169 @@ struct GamificationView: View {
     }
 
     private var profileCard: some View {
-        GlassCard(title: "Your Strength Profile", accent: accent) {
+        GlassCard(title: "Skill Profile", accent: accent) {
             VStack(spacing: 12) {
                 RadarHexChart(axes: viewModel.radarAxes)
-                    .frame(height: 340)
+                    .frame(height: 300)
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ForEach(viewModel.skillRows) { skill in
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(skill.color)
-                                .frame(width: 7, height: 7)
+                ForEach(viewModel.skillRows) { skill in
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
                             Text(skill.title)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            Spacer(minLength: 0)
+                            Text("Lv \(skill.level)")
                                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.secondary)
                         }
+
+                        ProgressView(value: skill.progress0to1)
+                            .tint(skill.color)
+
+                        Text("\(skill.xpInLevel)/\(skill.xpToNext) XP")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
                     }
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.white.opacity(0.05))
+                    )
                 }
             }
         }
     }
 
     private var challengesCard: some View {
-        GlassCard(title: "Daily Challenges", accent: accent) {
-            ZStack {
-                ChallengeBurstView(trigger: viewModel.celebrationToken, tint: accent)
+        GlassCard(title: "Challenges", accent: accent) {
+            VStack(spacing: 12) {
+                challengeSection(title: "Daily", items: viewModel.dailyChallenges)
+                challengeSection(title: "Weekly", items: viewModel.weeklyChallenges)
+                challengeSection(title: "Seasonal", items: viewModel.seasonalChallenges)
+                Text(viewModel.weeklyGoalText)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    ForEach(viewModel.challenges) { challenge in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(alignment: .top, spacing: 6) {
-                                Text(challenge.title)
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .lineLimit(1)
+    private func challengeSection(title: String, items: [GamificationViewModel.ChallengeRow]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(.secondary)
 
-                                Spacer(minLength: 0)
-
-                                Image(systemName: challenge.completed ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(challenge.completed ? .green : .white.opacity(0.3))
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .scaleEffect(challenge.completed ? 1.08 : 1.0)
-                                    .animation(.easeInOut(duration: 0.2), value: challenge.completed)
-                            }
-
-                            Text(challenge.description)
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                                .frame(maxHeight: .infinity, alignment: .top)
-
-                            ProgressView(value: Double(challenge.progress), total: Double(max(1, challenge.target)))
-                                .tint(challenge.completed ? .green : accent)
-
-                            HStack {
-                                Text("\(challenge.progress)/\(challenge.target)")
-                                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.secondary)
-                                Spacer(minLength: 0)
-                                Text("+\(challenge.rewardXP) XP")
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(accent)
-                            }
+            if items.isEmpty {
+                Text("No challenges")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(items) { challenge in
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(challenge.title)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            Spacer(minLength: 0)
+                            Text("+\(challenge.rewardXP) XP")
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .foregroundStyle(accent)
                         }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color.white.opacity(0.05))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(challenge.completed ? Color.green.opacity(0.45) : Color.white.opacity(0.08), lineWidth: 1)
-                        )
+
+                        Text(challenge.description)
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+
+                        ProgressView(value: Double(challenge.progress), total: Double(max(1, challenge.target)))
+                            .tint(challenge.completed ? .green : accent)
                     }
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.white.opacity(0.05))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(challenge.completed ? Color.green.opacity(0.4) : Color.white.opacity(0.1), lineWidth: 1)
+                            )
+                    )
                 }
             }
+        }
+    }
+
+    private var seasonCard: some View {
+        GlassCard(title: "Season", accent: accent) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(viewModel.seasonTitle)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                Text(viewModel.seasonSubtitle)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var recoveryCard: some View {
+        GlassCard(title: "Recovery / Reset", accent: accent) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(viewModel.recoveryText)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 10) {
+                    Button("Mark Recovery Complete") {
+                        appState.gamificationService.completeRecoveryChallenge()
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button("Activate Reset Day") {
+                        appState.gamificationService.activateResetDayIfAvailable()
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Text(viewModel.resetDayText)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private var achievementsCard: some View {
         GlassCard(title: "Achievements", accent: accent) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(viewModel.achievements) { item in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 6) {
-                                Image(systemName: item.unlocked ? "rosette" : "seal")
-                                    .foregroundStyle(item.unlocked ? accent : .white.opacity(0.4))
-                                Text(item.title)
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                            }
+            if viewModel.achievements.isEmpty {
+                Text("No achievements unlocked yet")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(viewModel.achievements.prefix(8)) { achievement in
+                        HStack(spacing: 10) {
+                            Image(systemName: achievement.icon)
+                                .foregroundStyle(accent)
+                                .frame(width: 16)
 
-                            Text(item.description)
-                                .font(.system(size: 10, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-
-                            Text(item.unlocked ? "Unlocked" : "Locked")
-                                .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundStyle(item.unlocked ? .green : .white.opacity(0.45))
-                        }
-                        .padding(12)
-                        .frame(width: 185, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color.white.opacity(item.unlocked ? 0.08 : 0.04))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(item.unlocked ? accent.opacity(0.35) : Color.white.opacity(0.07), lineWidth: 1)
-                        )
-                    }
-                }
-                .padding(.vertical, 1)
-            }
-        }
-    }
-
-    private var upgradesCard: some View {
-        GlassCard(title: "Skill Upgrades", accent: accent) {
-            VStack(spacing: 10) {
-                ForEach(viewModel.skillRows) { skill in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(skill.title)
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                Text("Level \(skill.level)")
-                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                Text(achievement.title)
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                Text(achievement.description)
+                                    .font(.system(size: 11, weight: .medium, design: .rounded))
                                     .foregroundStyle(.secondary)
                             }
 
                             Spacer(minLength: 0)
-
-                            Button {
-                                confirmAxis = skill.axis
-                            } label: {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 18, weight: .bold))
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(viewModel.skillPoints > 0 ? skill.color : .gray)
-                            .disabled(viewModel.skillPoints == 0)
-                            .popover(
-                                isPresented: Binding(
-                                    get: { confirmAxis == skill.axis },
-                                    set: { showing in
-                                        if showing == false, confirmAxis == skill.axis {
-                                            confirmAxis = nil
-                                        }
-                                    }
-                                ),
-                                arrowEdge: .top
-                            ) {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text("Spend Skill Point")
-                                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    Text("Use 1 SP to add +20 XP to \(skill.title).")
-                                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.secondary)
-
-                                    HStack {
-                                        Button("Cancel") {
-                                            confirmAxis = nil
-                                        }
-                                        .buttonStyle(.bordered)
-
-                                        Button("Spend") {
-                                            viewModel.spendSkillPoint(on: skill.axis)
-                                            confirmAxis = nil
-                                        }
-                                        .buttonStyle(.borderedProminent)
-                                        .tint(skill.color)
-                                    }
-                                }
-                                .padding(14)
-                                .frame(width: 250)
-                            }
                         }
-
-                        ProgressView(value: skill.progress0to1)
-                            .tint(skill.color)
-
-                        Text("\(skill.xpInLevel)/100 XP")
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.white.opacity(0.05))
-                    )
-                }
-            }
-            .animation(.easeInOut(duration: 0.22), value: viewModel.skillRows.map(\.progress0to1))
-        }
-    }
-}
-
-// =====================================================
-// MARK: - Challenge Burst
-// [TAG: V2_GAMIFICATION_BURST]
-// =====================================================
-
-private struct ChallengeBurstView: View {
-    let trigger: Int
-    let tint: Color
-
-    @State private var animate = false
-
-    private let dots: [Dot] = Dot.makeDots()
-
-    var body: some View {
-        GeometryReader { proxy in
-            ZStack {
-                ForEach(dots) { dot in
-                    Circle()
-                        .fill(tint.opacity(0.8))
-                        .frame(width: dot.size, height: dot.size)
-                        .position(
-                            x: dot.x * proxy.size.width,
-                            y: dot.y * proxy.size.height
+                        .padding(10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.white.opacity(0.05))
                         )
-                        .offset(x: animate ? dot.dx : 0, y: animate ? dot.dy : 0)
-                        .opacity(animate ? 0 : 0.85)
-                        .animation(.easeOut(duration: 0.32).delay(dot.delay), value: animate)
+                    }
                 }
             }
-            .allowsHitTesting(false)
-            .onChange(of: trigger) { _, _ in
-                animate = false
-                withAnimation(.easeOut(duration: 0.34)) {
-                    animate = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    animate = false
-                }
-            }
-        }
-    }
-
-    private struct Dot: Identifiable {
-        let id: Int
-        let x: CGFloat
-        let y: CGFloat
-        let size: CGFloat
-        let delay: Double
-        let dx: CGFloat
-        let dy: CGFloat
-
-        static func makeDots() -> [Dot] {
-            var values: [Dot] = []
-            for index in 0..<14 {
-                values.append(
-                    Dot(
-                        id: index,
-                        x: CGFloat((index * 17) % 100) / 100.0,
-                        y: CGFloat((index * 23) % 100) / 100.0,
-                        size: CGFloat(3 + (index % 4)),
-                        delay: Double(index) * 0.01,
-                        dx: CGFloat(((index % 5) - 2)) * 12,
-                        dy: CGFloat(-24 - (index % 4) * 10)
-                    )
-                )
-            }
-            return values
         }
     }
 }
