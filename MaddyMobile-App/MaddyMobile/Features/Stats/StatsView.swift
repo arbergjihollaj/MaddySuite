@@ -47,7 +47,7 @@ struct StatsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         statRow("Today focus", "\(focus.todayFocusMinutes) min")
                         statRow("Open tasks", "\(tasks.openCount)")
-                        statRow("Tasks done", "\(tasks.doneCount)")
+                        statRow("Tasks done", "\(tasks.archivedTasks.count)")
                         statRow("Habits done today", habits.todayProgressText)
                     }
                 }

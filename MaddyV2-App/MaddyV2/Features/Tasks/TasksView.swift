@@ -37,7 +37,6 @@ struct TasksView: View {
     @AppStorage("maddy.tasks.stateHueEnabled") private var taskStateHueEnabled: Bool = true
 
     @State private var showingEditor = false
-    @State private var showingArchiveSheet = false
     @State private var composerMode: TaskComposerMode = .create
 
     @State private var dragTaskID: UUID?
@@ -86,17 +85,13 @@ struct TasksView: View {
             )
             .environmentObject(appState)
         }
-        .sheet(isPresented: $showingArchiveSheet) {
-            TasksArchiveSheet()
-                .environmentObject(appState)
-        }
         .onReceive(vm.$latestArchiveNotice.compactMap { $0 }) { notice in
             showArchiveToast(title: notice.title, archiveID: notice.archiveID)
         }
         .overlay(alignment: .bottomTrailing) {
             if let archiveToast {
                 HStack(spacing: 10) {
-                    Label("Task archived", systemImage: "checkmark.circle.fill")
+                    Label("Task archived ✓", systemImage: "checkmark.circle.fill")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white)
 
@@ -139,18 +134,11 @@ struct TasksView: View {
 
     private var taskActions: some View {
         HStack(spacing: 10) {
-            Text("Drag cards to Done to mark complete")
+            Text("Drag cards to Done to archive")
                 .font(.system(size: 12, weight: .medium, design: .rounded))
                 .foregroundStyle(.secondary)
 
             Spacer()
-
-            Button {
-                showingArchiveSheet = true
-            } label: {
-                Label("Archive (\(vm.archivedTasks.count))", systemImage: "archivebox")
-            }
-            .buttonStyle(.bordered)
 
             Button {
                 composerMode = .create
@@ -187,11 +175,6 @@ struct TasksView: View {
             },
             onStartFocus: { task in
                 vm.startFocus(for: task)
-            },
-            onArchive: { task in
-                withAnimation(.spring(duration: 0.24, bounce: 0.15)) {
-                    vm.archive(taskID: task.id)
-                }
             },
             onMoveTask: { sourceID, targetStatus, beforeID in
                 withAnimation(.spring(duration: 0.24, bounce: 0.15)) {
@@ -243,7 +226,6 @@ private struct TaskLaneColumn: View {
     let onCardTap: (TaskItem) -> Void
     let onMoveTo: (TaskItem, TaskStatus) -> Void
     let onStartFocus: (TaskItem) -> Void
-    let onArchive: (TaskItem) -> Void
     let onMoveTask: (UUID, TaskStatus, UUID?) -> Void
 
     var body: some View {
@@ -254,7 +236,7 @@ private struct TaskLaneColumn: View {
                         .fill(Color.white.opacity(0.03))
                         .frame(height: 92)
                         .overlay {
-                            Text(laneStatus == .done ? "Drop task here to mark done" : "Drop task here")
+                            Text(laneStatus == .done ? "Drop task here to archive" : "Drop task here")
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
                                 .foregroundStyle(.secondary)
                         }
@@ -266,8 +248,7 @@ private struct TaskLaneColumn: View {
                             showsStateHue: showsStateHue,
                             onTap: { onCardTap(task) },
                             onMoveTo: { onMoveTo(task, $0) },
-                            onStartFocus: { onStartFocus(task) },
-                            onArchive: { onArchive(task) }
+                            onStartFocus: { onStartFocus(task) }
                         )
                         .transition(.asymmetric(
                             insertion: .opacity.combined(with: .scale(scale: 0.98)),
@@ -323,84 +304,75 @@ private struct TaskCardView: View {
     let onTap: () -> Void
     let onMoveTo: (TaskStatus) -> Void
     let onStartFocus: () -> Void
-    let onArchive: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 9) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(task.title)
-                            .font(.headline)
-                            .lineLimit(2)
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(task.title)
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .lineLimit(2)
 
-                        if task.tags.isEmpty == false {
-                            Text(task.tags.joined(separator: " • "))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        if let dueDate = task.dueDate {
-                            Text("Due \(dueDate.formatted(date: .abbreviated, time: .shortened))")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
+                    if task.tags.isEmpty == false {
+                        Text(task.tags.joined(separator: " • "))
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
                     }
 
-                    Spacer(minLength: 6)
-
-                    Text(task.priority.rawValue.capitalized)
-                        .font(.caption.weight(.bold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(priorityColor(task.priority).opacity(0.22), in: Capsule())
-                }
-
-                HStack {
-                    Menu("Move") {
-                        ForEach(TaskStatus.allCases) { status in
-                            Button(status.title) {
-                                onMoveTo(status)
-                            }
-                        }
-                        if task.status == .done {
-                            Divider()
-                            Button("Archive Task", systemImage: "archivebox") {
-                                onArchive()
-                            }
-                        }
-                    }
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-
-                    Button("Start Focus") {
-                        onStartFocus()
-                    }
-                    .buttonStyle(.bordered)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-
-                    Spacer(minLength: 0)
-
-                    if task.recurrence != .none {
-                        Label(task.recurrence.rawValue.capitalized, systemImage: "repeat")
-                            .font(.caption.weight(.semibold))
+                    if let dueDate = task.dueDate {
+                        Text("Due \(dueDate.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundStyle(.secondary)
                     }
                 }
+
+                Spacer(minLength: 6)
+
+                Text(task.priority.rawValue.capitalized)
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(priorityColor(task.priority).opacity(0.22), in: Capsule())
             }
-            .padding(10)
-            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(cardBackgroundColor)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+
+            HStack {
+                Menu("Move") {
+                    ForEach(TaskStatus.allCases) { status in
+                        Button(status.title) {
+                            onMoveTo(status)
+                        }
                     }
-            )
+                }
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+
+                Button("Start Focus") {
+                    onStartFocus()
+                }
+                .buttonStyle(.bordered)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+
+                Spacer(minLength: 0)
+
+                if task.recurrence != .none {
+                    Label(task.recurrence.rawValue.capitalized, systemImage: "repeat")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(task.title)
-        .accessibilityHint("Open task details")
+        .padding(10)
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(cardBackgroundColor)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 0.8)
+                }
+        )
+        .onTapGesture {
+            onTap()
+        }
     }
 
     private var cardBackgroundColor: Color {
@@ -426,72 +398,6 @@ private struct TaskCardView: View {
         case .medium: return .yellow
         case .high: return .red
         }
-    }
-}
-
-private struct TasksArchiveSheet: View {
-    @EnvironmentObject var appState: AppState
-    @Environment(\.dismiss) private var dismiss
-
-    private var vm: TasksViewModel { appState.tasksViewModel }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Archive")
-                    .font(.title3.weight(.semibold))
-                Spacer(minLength: 0)
-                Button("Done") { dismiss() }
-            }
-
-            if vm.archivedTasks.isEmpty {
-                ContentUnavailableView(
-                    "No archived tasks",
-                    systemImage: "archivebox",
-                    description: Text("Completed tasks stay in Done. Archive is for optional long-term cleanup.")
-                )
-            } else {
-                List {
-                    ForEach(vm.archivedTasks) { archived in
-                        HStack(spacing: 10) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(archived.task.title)
-                                    .font(.body.weight(.semibold))
-                                    .lineLimit(1)
-                                Text("Archived \(archived.archivedAt.formatted(date: .abbreviated, time: .shortened))")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 0)
-                            Button("Restore") {
-                                vm.restoreArchived(archiveID: archived.id)
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button(role: .destructive) {
-                                vm.deleteArchived(archiveID: archived.id)
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                    }
-                }
-                .listStyle(.inset)
-
-                HStack {
-                    Spacer(minLength: 0)
-                    Button(role: .destructive) {
-                        vm.clearArchive()
-                    } label: {
-                        Label("Clear Archive", systemImage: "trash.slash")
-                    }
-                    .buttonStyle(.bordered)
-                }
-            }
-        }
-        .padding(16)
-        .frame(minWidth: 520, minHeight: 420)
     }
 }
 

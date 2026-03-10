@@ -14,7 +14,6 @@ struct TaskEditorSheet: View {
     @State private var tagsText: String
     @State private var hasDueDate: Bool
     @State private var showDeleteConfirm = false
-    @State private var showAdvanced = false
     @State private var primarySkill: TaskSkillTag
     @State private var secondarySkillEnabled: Bool
     @State private var secondarySkill: TaskSkillTag
@@ -37,7 +36,7 @@ struct TaskEditorSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Basic") {
+                Section("Task") {
                     TextField("Title", text: $draft.title)
 
                     Picker("Status", selection: $draft.status) {
@@ -45,24 +44,7 @@ struct TaskEditorSheet: View {
                             Text(status.title).tag(status)
                         }
                     }
-                }
 
-                Section("Planning") {
-                    Toggle("Due date", isOn: $hasDueDate)
-                    if hasDueDate {
-                        DatePicker("Due", selection: Binding(
-                            get: { draft.dueDate ?? Date() },
-                            set: { draft.dueDate = $0 }
-                        ), displayedComponents: [.date, .hourAndMinute])
-                    }
-
-                    Toggle("Daily task", isOn: $draft.isDailyTask)
-                    if draft.isDailyTask {
-                        Toggle("Required daily task", isOn: $draft.isRequiredDailyTask)
-                    }
-                }
-
-                Section("Priority & Difficulty") {
                     Picker("Difficulty", selection: $draft.difficulty) {
                         ForEach(TaskDifficulty.allCases) { value in
                             Text(value.title).tag(value)
@@ -75,21 +57,31 @@ struct TaskEditorSheet: View {
                         }
                     }
 
-                    DisclosureGroup("Advanced options", isExpanded: $showAdvanced) {
-                        TextField("Tags (comma separated)", text: $tagsText)
+                    Toggle("Due date", isOn: $hasDueDate)
+                    if hasDueDate {
+                        DatePicker("Due", selection: Binding(
+                            get: { draft.dueDate ?? Date() },
+                            set: { draft.dueDate = $0 }
+                        ), displayedComponents: [.date, .hourAndMinute])
+                    }
 
-                        Picker("Primary skill", selection: $primarySkill) {
+                    TextField("Tags (comma separated)", text: $tagsText)
+
+                    Toggle("Daily task", isOn: $draft.isDailyTask)
+                    if draft.isDailyTask {
+                        Toggle("Required daily task", isOn: $draft.isRequiredDailyTask)
+                    }
+
+                    Picker("Primary skill", selection: $primarySkill) {
+                        ForEach(TaskSkillTag.allCases) { tag in
+                            Text(tag.title).tag(tag)
+                        }
+                    }
+                    Toggle("Second skill", isOn: $secondarySkillEnabled)
+                    if secondarySkillEnabled {
+                        Picker("Secondary skill", selection: $secondarySkill) {
                             ForEach(TaskSkillTag.allCases) { tag in
                                 Text(tag.title).tag(tag)
-                            }
-                        }
-
-                        Toggle("Second skill", isOn: $secondarySkillEnabled)
-                        if secondarySkillEnabled {
-                            Picker("Secondary skill", selection: $secondarySkill) {
-                                ForEach(TaskSkillTag.allCases) { tag in
-                                    Text(tag.title).tag(tag)
-                                }
                             }
                         }
                     }

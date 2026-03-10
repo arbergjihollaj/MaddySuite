@@ -17,6 +17,8 @@ struct HabitEditorSheet: View {
     let onSave: (Habit) -> Void
     let onDelete: (UUID) -> Void
 
+    private let weekdaySymbols = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
     init(habit: Habit, onSave: @escaping (Habit) -> Void, onDelete: @escaping (UUID) -> Void) {
         _draft = State(initialValue: habit)
         _color = State(initialValue: Color(hex: habit.colorHex) ?? .green)
@@ -53,16 +55,13 @@ struct HabitEditorSheet: View {
                     .pickerStyle(.segmented)
 
                     if draft.scheduleMode == .weekdays {
-                        Text("Choose the days when this habit should appear as planned.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                         HStack {
-                            ForEach(HabitSchedule.weekdayLabels(), id: \.value) { day in
-                                let selected = HabitSchedule.normalizedWeekdays(draft.weekdays).contains(day.value)
+                            ForEach(0..<7, id: \.self) { idx in
+                                let selected = draft.weekdays.contains(idx + 2)
                                 Button {
-                                    toggleWeekday(day.value)
+                                    toggleWeekday(idx + 2)
                                 } label: {
-                                    Text(day.label)
+                                    Text(weekdaySymbols[idx])
                                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 8)
@@ -114,14 +113,16 @@ struct HabitEditorSheet: View {
             draft.weekdays.removeAll { $0 == day }
         } else {
             draft.weekdays.append(day)
+            draft.weekdays.sort()
         }
-        draft.weekdays = HabitSchedule.normalizedWeekdays(draft.weekdays)
     }
 
     private func saveAndClose() {
         draft.title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
         draft.colorHex = color.hexString
-        draft.weekdays = HabitSchedule.normalizedWeekdays(draft.weekdays)
+        if draft.weekdays.isEmpty {
+            draft.weekdays = [2, 3, 4, 5, 6]
+        }
         onSave(draft)
         dismiss()
     }

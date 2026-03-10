@@ -13,10 +13,6 @@ enum TaskStatus: String, Codable, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    static var allCases: [TaskStatus] {
-        [.backlog, .inProgress, .done]
-    }
-
     var title: String {
         switch self {
         case .backlog: return "Backlog"

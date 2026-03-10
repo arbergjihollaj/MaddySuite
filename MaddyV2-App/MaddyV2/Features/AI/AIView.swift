@@ -17,7 +17,6 @@ struct AIView: View {
     @AppStorage("maddy.ai.showQuickActions") private var aiShowQuickActions: Bool = true
     @AppStorage("maddy.ai.showDailyChallenge") private var aiShowDailyChallenge: Bool = true
     @AppStorage("maddy.ai.showToolStrip") private var aiShowToolStrip: Bool = true
-    @State private var showAdvancedControls = false
 
     private var ai: AIService { appState.aiService }
 
@@ -89,29 +88,8 @@ struct AIView: View {
                     }
                     .pickerStyle(.segmented)
                     .frame(maxWidth: 260)
-                }
 
-                HStack(spacing: 10) {
-                    statusChip
-
-                    if ai.hasNotes {
-                        Text("Notes \(ai.noteCount)")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Toggle("Use Notes", isOn: Binding(
-                        get: { ai.memory.useNotesForAnswers },
-                        set: { ai.setUseNotesForAnswers($0) }
-                    ))
-                    .toggleStyle(.switch)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-
-                    Spacer(minLength: 0)
-                }
-
-                if aiShowToolStrip {
-                    DisclosureGroup("Advanced controls", isExpanded: $showAdvancedControls) {
+                    if aiShowToolStrip {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
                                 ForEach(ai.orderedTools) { tool in
@@ -137,7 +115,25 @@ struct AIView: View {
                             .padding(.vertical, 1)
                         }
                     }
+                }
+
+                HStack(spacing: 10) {
+                    statusChip
+
+                    if ai.hasNotes {
+                        Text("Notes \(ai.noteCount)")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Toggle("Use Notes", isOn: Binding(
+                        get: { ai.memory.useNotesForAnswers },
+                        set: { ai.setUseNotesForAnswers($0) }
+                    ))
+                    .toggleStyle(.switch)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
+
+                    Spacer(minLength: 0)
                 }
 
                 if let fallback = ai.providerFallbackNotice, fallback.isEmpty == false {

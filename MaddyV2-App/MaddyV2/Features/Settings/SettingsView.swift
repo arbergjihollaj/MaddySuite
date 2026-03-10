@@ -31,14 +31,13 @@ struct SettingsView: View {
     @AppStorage("maddy.tasks.stateHueEnabled") private var taskStateHueEnabled: Bool = true
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            categorySidebar
-            ScrollView {
+        ScrollView {
+            VStack(spacing: 16) {
+                categoryCardGrid
                 contentPanel
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(.bottom, 10)
         }
-        .padding(16)
         .onAppear {
             appState.showMenuBarHint = false
             if topBarOrderDraft.isEmpty {
@@ -55,38 +54,30 @@ struct SettingsView: View {
     // [TAG: SETTINGS_CATEGORY_CARDS]
     // =====================================================
 
-    private var categorySidebar: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private var categoryCardGrid: some View {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Settings")
-                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .font(.system(size: 22, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
 
-            ForEach(SettingsCategory.allCases) { category in
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        selectedCategory = category
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 146, maximum: 200), spacing: 12, alignment: .top)],
+                alignment: .leading,
+                spacing: 12
+            ) {
+                ForEach(SettingsCategory.allCases) { category in
+                    SettingsCategoryCard(
+                        category: category,
+                        selected: category == selectedCategory,
+                        accent: appState.accentColor
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            selectedCategory = category
+                        }
                     }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: category.icon)
-                            .frame(width: 18)
-                        Text(category.title)
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(selectedCategory == category ? appState.accentColor.opacity(0.22) : Color.white.opacity(0.04))
-                    )
                 }
-                .buttonStyle(.plain)
             }
-
-            Spacer(minLength: 0)
         }
-        .frame(width: 210)
     }
 
     private var contentPanel: some View {
@@ -129,62 +120,26 @@ struct SettingsView: View {
     private var categoryContent: some View {
         switch selectedCategory {
         case .general:
-            generalSection
-        case .appearance:
-            appearanceSection
-        case .productivity:
             VStack(spacing: 14) {
-                focusSection
-                habitsSection
-                tasksSection
+                appearanceSection
+                iCloudSyncSection
                 statisticsSection
+                fileShelfSection
             }
-        case .sync:
-            iCloudSyncSection
-        case .integrations:
-            VStack(spacing: 14) {
-                calendarSection
-                aiSection
-            }
-        case .advanced:
-            fileShelfSection
-        case .developer:
-            VStack(spacing: 14) {
-                serialSection
-                debugSection
-            }
-        }
-    }
-
-    private var generalSection: some View {
-        GlassCard(title: "General", accent: appState.accentColor) {
-            VStack(alignment: .leading, spacing: 10) {
-                Toggle("Enable Menu Bar Mode", isOn: Binding(
-                    get: { appState.settings.menuBarEnabled },
-                    set: { appState.settings.menuBarEnabled = $0 }
-                ))
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Home Widgets")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.secondary)
-
-                    HStack {
-                        ForEach(HomeWidgetKind.allCases) { widget in
-                            let selected = appState.settings.homeWidgets.contains(widget)
-                            Button(widget.title) {
-                                appState.toggleWidget(widget, enabled: selected == false)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(selected ? appState.accentColor : .gray)
-                        }
-                    }
-                }
-
-                Text("Core settings stay here. Technical diagnostics are under Developer.")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
+        case .ai:
+            aiSection
+        case .calendar:
+            calendarSection
+        case .focus:
+            focusSection
+        case .habits:
+            habitsSection
+        case .tasks:
+            tasksSection
+        case .serial:
+            serialSection
+        case .debug:
+            debugSection
         }
     }
 
@@ -207,6 +162,28 @@ struct SettingsView: View {
                     Text(String(format: "%.2f", appState.settings.glassIntensity))
                         .monospacedDigit()
                         .frame(width: 42)
+                }
+
+                Toggle("Enable Menu Bar Mode", isOn: Binding(
+                    get: { appState.settings.menuBarEnabled },
+                    set: { appState.settings.menuBarEnabled = $0 }
+                ))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Home Widgets")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+
+                    HStack {
+                        ForEach(HomeWidgetKind.allCases) { widget in
+                            let selected = appState.settings.homeWidgets.contains(widget)
+                            Button(widget.title) {
+                                appState.toggleWidget(widget, enabled: selected == false)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(selected ? appState.accentColor : .gray)
+                        }
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -960,48 +937,52 @@ struct SettingsView: View {
 
 private enum SettingsCategory: String, CaseIterable, Identifiable {
     case general
-    case appearance
-    case productivity
-    case sync
-    case integrations
-    case advanced
-    case developer
+    case ai
+    case calendar
+    case focus
+    case habits
+    case tasks
+    case serial
+    case debug
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .general: return "General"
-        case .appearance: return "Appearance"
-        case .productivity: return "Productivity"
-        case .sync: return "Sync"
-        case .integrations: return "Integrations"
-        case .advanced: return "Advanced"
-        case .developer: return "Developer"
+        case .ai: return "AI"
+        case .calendar: return "Calendar"
+        case .focus: return "Focus"
+        case .habits: return "Habits"
+        case .tasks: return "Tasks"
+        case .serial: return "Serial"
+        case .debug: return "Debug"
         }
     }
 
     var subtitle: String {
         switch self {
-        case .general: return "Core app preferences"
-        case .appearance: return "Theme and top bar"
-        case .productivity: return "Tasks, habits and focus"
-        case .sync: return "Folder and backend sync"
-        case .integrations: return "Calendar and coach"
-        case .advanced: return "Optional power features"
-        case .developer: return "Diagnostics and debug"
+        case .general: return "Appearance and export"
+        case .ai: return "Coach and model setup"
+        case .calendar: return "Sources and subscriptions"
+        case .focus: return "Pomodoro behavior"
+        case .habits: return "Weekly habits options"
+        case .tasks: return "Board defaults and archive"
+        case .serial: return "USB connection"
+        case .debug: return "Diagnostics and logs"
         }
     }
 
     var icon: String {
         switch self {
         case .general: return "gearshape"
-        case .appearance: return "paintpalette"
-        case .productivity: return "bolt.fill"
-        case .sync: return "arrow.triangle.2.circlepath"
-        case .integrations: return "link"
-        case .advanced: return "slider.horizontal.3"
-        case .developer: return "terminal"
+        case .ai: return "sparkles"
+        case .calendar: return "calendar"
+        case .focus: return "timer"
+        case .habits: return "flame"
+        case .tasks: return "checkmark.circle"
+        case .serial: return "cable.connector"
+        case .debug: return "wrench.and.screwdriver"
         }
     }
 }

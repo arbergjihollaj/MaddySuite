@@ -25,27 +25,64 @@ struct RootView: View {
 
     private var serialService: SerialService { appState.serialService }
 
-    private var routeSelection: Binding<AppRoute?> {
-        Binding<AppRoute?>(
-            get: { appState.route },
-            set: { selection in
-                guard let selection else { return }
-                appState.navigate(to: selection)
-            }
-        )
-    }
-
     var body: some View {
         ZStack {
             MaddyBackground(accent: appState.accentColor)
 
-            NavigationSplitView {
-                sidebar
-                    .frame(minWidth: 220)
-            } detail: {
-                mainDetail
+            VStack(spacing: 12) {
+                TitleBarView(
+                    currentRoute: appState.route,
+                    connectionState: connectionState,
+                    AIStatus: aiStatus,
+                    aiQuickAction: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            shellState.showAIQuickBar = true
+                        }
+                    }
+                ) {
+                    appState.navigate(to: .settings)
+                }
+
+                ZStack {
+                    switch appState.route {
+                    case .home:
+                        HomeView()
+                            .transition(.asymmetric(insertion: .move(edge: .leading).combined(with: .opacity), removal: .opacity))
+                    case .calendar:
+                        MacCalendarView()
+                            .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
+                    case .focus:
+                        FocusView()
+                            .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
+                    case .tasks:
+                        TasksView()
+                            .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
+                    case .habits:
+                        HabitsView()
+                            .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
+                    case .gamify:
+                        GamificationView(
+                            viewModel: GamificationViewModel(
+                                service: appState.gamificationService,
+                                accent: appState.accentColor
+                            ),
+                            accent: appState.accentColor
+                        )
+                        .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
+                    case .ai:
+                        AIView()
+                            .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
+                    case .settings:
+                        SettingsView()
+                            .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
+                    }
+                }
+                .animation(.easeInOut(duration: 0.28), value: appState.route)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                BottomNavigationBar()
             }
-            .navigationSplitViewStyle(.balanced)
+            .padding(16)
 
             if shellState.showAIQuickBar {
                 AIQuickBarView(
@@ -148,83 +185,6 @@ struct RootView: View {
         }
         .onChange(of: appState.gamificationService.dailySummarySignal) { _, _ in
             shellState.showDailySummaryToastIfNeeded(appState)
-        }
-    }
-
-    private var sidebar: some View {
-        List(selection: routeSelection) {
-            Section("Workspace") {
-                ForEach(appState.topOrder) { route in
-                    Label(route.title, systemImage: route.icon)
-                        .tag(route as AppRoute?)
-                }
-            }
-        }
-        .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
-        .background(Color.clear)
-    }
-
-    @ViewBuilder
-    private var mainDetail: some View {
-        ZStack {
-            switch appState.route {
-            case .home:
-                HomeView()
-            case .calendar:
-                MacCalendarView()
-            case .focus:
-                FocusView()
-            case .tasks:
-                TasksView()
-            case .habits:
-                HabitsView()
-            case .gamify:
-                GamificationView(
-                    viewModel: GamificationViewModel(
-                        service: appState.gamificationService,
-                        accent: appState.accentColor
-                    ),
-                    accent: appState.accentColor
-                )
-            case .ai:
-                AIView()
-            case .settings:
-                SettingsView()
-            }
-        }
-        .padding(16)
-        .animation(.easeInOut(duration: 0.22), value: appState.route)
-        .toolbar {
-            ToolbarItemGroup(placement: .automatic) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(connectionState.color)
-                        .frame(width: 8, height: 8)
-                    Text(connectionState.label)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        shellState.showAIQuickBar = true
-                    }
-                } label: {
-                    Image(systemName: aiStatus.symbol)
-                        .foregroundStyle(aiStatus.tint)
-                }
-                .help(aiStatus.accessibilityLabel)
-
-                if appState.route != .settings {
-                    Button {
-                        appState.navigate(to: .settings)
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .help("Open Settings")
-                }
-            }
         }
     }
 

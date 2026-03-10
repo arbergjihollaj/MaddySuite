@@ -97,14 +97,14 @@ struct HabitsView: View {
                 }
 
                 let today = Calendar.current.component(.weekday, from: Date())
-                let weekdayLabels = HabitItem.weekdayLabels(mondayFirst: appState.settings.habitWeekStartsMonday)
                 HStack(spacing: 8) {
-                    ForEach(weekdayLabels, id: \.value) { day in
-                        Text(day.label)
+                    ForEach(Array(HabitItem.weekdaySymbols.enumerated()), id: \.offset) { idx, symbol in
+                        let weekday = idx + 1
+                        Text(symbol)
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .frame(width: 30, height: 30)
                             .background(
-                                Circle().fill(today == day.value ? appState.accentColor.opacity(0.4) : Color.white.opacity(0.06))
+                                Circle().fill(today == weekday ? appState.accentColor.opacity(0.4) : Color.white.opacity(0.06))
                             )
                     }
                 }
@@ -114,7 +114,7 @@ struct HabitsView: View {
 
     private var habitsList: some View {
         VStack(spacing: 10) {
-            ForEach(sortedHabits) { habit in
+            ForEach(vm.habits) { habit in
                 habitRow(habit)
             }
         }
@@ -195,8 +195,6 @@ struct HabitsView: View {
 
     private func habitRow(_ habit: HabitItem) -> some View {
         let color = Color(hex: habit.accentHex) ?? appState.accentColor
-        let isScheduledToday = vm.isScheduledToday(habit)
-        let nextScheduledDate = vm.nextScheduledDate(for: habit)
 
         return GlassCard(accent: color) {
             HStack(alignment: .center, spacing: 12) {
@@ -226,23 +224,9 @@ struct HabitsView: View {
                     }
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
-
-                    Text(habitScheduleText(for: habit, isScheduledToday: isScheduledToday, nextScheduledDate: nextScheduledDate))
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
                 }
 
                 Spacer()
-
-                Text(isScheduledToday ? "Today" : "Later")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill((isScheduledToday ? color : .white).opacity(0.18))
-                    )
-                    .foregroundStyle(.secondary)
 
                 Button(habit.kind == .timeBased ? "+5" : "+1") {
                     let wasDone = vm.completedToday(for: habit)
@@ -260,7 +244,6 @@ struct HabitsView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(color)
-                .help(isScheduledToday ? "Mark habit as completed for today" : "Complete habit even though it is not scheduled today")
 
                 Button("Preview ESP") {
                     serialService.sendHabitPreview(name: habit.title)
@@ -289,9 +272,8 @@ struct HabitsView: View {
     }
 
     private func syncHabitsSummaryToESP() {
-        let scheduledToday = vm.habits.filter { vm.isScheduledToday($0) }
-        let doneToday = scheduledToday.filter { vm.completedToday(for: $0) }.count
-        let totalToday = scheduledToday.count
+        let doneToday = vm.habits.filter { vm.completedToday(for: $0) }.count
+        let totalToday = vm.habits.count
         let streak = vm.habits.map { vm.currentStreak(for: $0) }.max() ?? 0
         serialService.sendHabitsSummary(
             doneToday: doneToday,
@@ -376,16 +358,15 @@ struct HabitsView: View {
 
     private func completionScore(for day: Date) -> Double {
         let key = day.yyyymmdd
-        let scheduledHabits = vm.habits.filter { $0.isScheduled(on: day) }
-        guard scheduledHabits.isEmpty == false else { return 0 }
+        guard vm.habits.isEmpty == false else { return 0 }
 
         var score = 0.0
-        for habit in scheduledHabits {
+        for habit in vm.habits {
             let done = habit.history[key, default: 0]
             let target = max(1, habit.targetPerDay)
             score += min(1.0, Double(done) / Double(target))
         }
-        return score / Double(scheduledHabits.count)
+        return score
     }
 
     private func heatmapColor(value: Double, maxValue: Double, tint: Color) -> Color {
@@ -394,30 +375,6 @@ struct HabitsView: View {
         }
         let normalized = min(1.0, value / maxValue)
         return tint.opacity(0.18 + (normalized * 0.82))
-    }
-
-    private var sortedHabits: [HabitItem] {
-        vm.habits.sorted { lhs, rhs in
-            let lhsScheduled = vm.isScheduledToday(lhs)
-            let rhsScheduled = vm.isScheduledToday(rhs)
-            if lhsScheduled != rhsScheduled {
-                return lhsScheduled && rhsScheduled == false
-            }
-            return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
-        }
-    }
-
-    private func habitScheduleText(for habit: HabitItem, isScheduledToday: Bool, nextScheduledDate: Date?) -> String {
-        if vm.completedToday(for: habit) {
-            return "Completed today"
-        }
-        if isScheduledToday {
-            return "Planned today"
-        }
-        if let nextScheduledDate {
-            return "Not planned today • Next \(nextScheduledDate.formatted(date: .abbreviated, time: .omitted))"
-        }
-        return "Not planned today"
     }
 }
 
@@ -460,6 +417,10 @@ private struct HabitEditorSheet: View {
 
     private static let palette: [String] = [
         "#24C483", "#4DA3FF", "#FF7A2F", "#FF5C7A", "#A98BFF", "#FFD166", "#5EEAD4", "#F97316"
+    ]
+
+    private static let mondayFirstWeekdays: [(label: String, value: Int)] = [
+        ("M", 2), ("T", 3), ("W", 4), ("T", 5), ("F", 6), ("S", 7), ("S", 1)
     ]
 
     var body: some View {
@@ -647,15 +608,15 @@ private struct HabitEditorSheet: View {
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 8) {
-                    ForEach(HabitItem.weekdayLabels(mondayFirst: appState.settings.habitWeekStartsMonday), id: \.value) { day in
-                        let selected = HabitItem.normalizedWeekdays(vm.draft.scheduledWeekdays).contains(day.value)
+                    ForEach(Self.mondayFirstWeekdays, id: \.value) { day in
+                        let selected = vm.draft.scheduledWeekdays.contains(day.value)
                         Button(day.label) {
                             if selected {
                                 vm.draft.scheduledWeekdays.removeAll { $0 == day.value }
                             } else {
                                 vm.draft.scheduledWeekdays.append(day.value)
+                                vm.draft.scheduledWeekdays.sort()
                             }
-                            vm.draft.scheduledWeekdays = HabitItem.normalizedWeekdays(vm.draft.scheduledWeekdays)
                         }
                         .buttonStyle(.bordered)
                         .tint(selected ? appState.accentColor : .gray)
