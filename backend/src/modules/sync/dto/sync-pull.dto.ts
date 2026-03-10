@@ -1,8 +1,10 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 
 export class SyncPullQueryDto {
   @IsOptional()
+  @IsString()
+  @Matches(/^\d+$/)
   cursor?: string;
 
   @IsOptional()

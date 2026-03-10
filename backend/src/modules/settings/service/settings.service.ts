@@ -29,7 +29,7 @@ export class SettingsService {
         payload: saved.payload,
         updatedAt: saved.updatedAt.toISOString(),
       },
-      sourceDeviceId: user.deviceId,
+      sourceDeviceId: user.serverDeviceId ?? user.deviceId,
     });
 
     return saved;

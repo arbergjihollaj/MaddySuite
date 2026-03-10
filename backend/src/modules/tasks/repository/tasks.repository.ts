@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma, Task } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, Task, TaskStatus } from '@prisma/client';
 import { PrismaService } from '@/common/prisma/prisma.service';
 
 @Injectable()
@@ -24,11 +24,22 @@ export class TasksRepository {
     return this.prisma.task.create({ data });
   }
 
-  update(id: string, userId: string, data: Prisma.TaskUncheckedUpdateInput): Promise<Task> {
-    return this.prisma.task.update({
-      where: { id },
+  async update(id: string, userId: string, data: Prisma.TaskUncheckedUpdateInput): Promise<Task> {
+    const updated = await this.prisma.task.updateMany({
+      where: { id, userId },
       data,
     });
+
+    if (updated.count === 0) {
+      throw new NotFoundException('Task not found');
+    }
+
+    const row = await this.findByIdForUser(id, userId);
+    if (!row) {
+      throw new NotFoundException('Task not found');
+    }
+
+    return row;
   }
 
   async upsertWithLww(input: {
@@ -37,31 +48,41 @@ export class TasksRepository {
     data: Prisma.TaskUncheckedCreateInput;
     updateData: Prisma.TaskUncheckedUpdateInput;
     clientUpdatedAt: Date;
-  }): Promise<{ task: Task; applied: boolean }> {
+  }): Promise<{ task: Task; applied: boolean; operation: 'created' | 'updated' | null }> {
     const existing = await this.findByIdForUser(input.id, input.userId);
 
     if (!existing) {
       const created = await this.create(input.data);
-      return { task: created, applied: true };
+      return { task: created, applied: true, operation: 'created' };
     }
 
     if (input.clientUpdatedAt < existing.clientUpdatedAt) {
-      return { task: existing, applied: false };
+      return { task: existing, applied: false, operation: null };
     }
 
     const updated = await this.update(input.id, input.userId, input.updateData);
-    return { task: updated, applied: true };
+    return { task: updated, applied: true, operation: 'updated' };
   }
 
-  softDelete(id: string, userId: string, clientUpdatedAt: Date): Promise<Task> {
-    return this.prisma.task.update({
-      where: { id },
+  async softDelete(id: string, userId: string, clientUpdatedAt: Date): Promise<Task> {
+    const updated = await this.prisma.task.updateMany({
+      where: { id, userId },
       data: {
-        userId,
-        status: 'DELETED',
-        deletedAt: new Date(),
+        status: TaskStatus.DELETED,
+        deletedAt: clientUpdatedAt,
         clientUpdatedAt,
       },
     });
+
+    if (updated.count === 0) {
+      throw new NotFoundException('Task not found');
+    }
+
+    const row = await this.findByIdForUser(id, userId);
+    if (!row) {
+      throw new NotFoundException('Task not found');
+    }
+
+    return row;
   }
 }

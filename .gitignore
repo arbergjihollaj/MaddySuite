@@ -11,6 +11,7 @@ build/
 # Swift Package Manager
 .build/
 .swiftpm/
+MaddyV2-App/MaddyV2/.build/
 
 # CocoaPods
 Pods/
@@ -31,3 +32,4 @@ fastlane/test_output/
 
 # Logs
 *.log
+*_full_output.txt

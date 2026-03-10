@@ -257,6 +257,47 @@ struct SettingsView: View {
                         Toggle("Enable Folder Sync (iCloud Drive)", isOn: $settings.iCloudSyncEnabled)
                             .tint(settings.accentColor)
 
+                        Divider().overlay(Color.white.opacity(0.08))
+
+                        Toggle("Enable Backend Sync (API)", isOn: $settings.backendSyncEnabled)
+                            .tint(settings.accentColor)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Backend Base URL")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(AppTheme.textSecondary)
+
+                            TextField("http://127.0.0.1:4000/v1", text: $settings.backendBaseURL)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled(true)
+                                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(Color.white.opacity(0.05))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                )
+                        }
+
+                        HStack(spacing: 8) {
+                            Text("Device ID")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(AppTheme.textSecondary)
+                            Text(settings.backendClientDeviceID)
+                                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                .foregroundStyle(AppTheme.textSecondary)
+                                .lineLimit(1)
+                            Spacer()
+                            Button("Regenerate") {
+                                settings.regenerateBackendClientDeviceID()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Sync Folder")
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -317,7 +358,7 @@ struct SettingsView: View {
                             .disabled(settings.iCloudSyncEnabled == false || appModel.syncStatus == .syncing)
                         }
 
-                        Text("Maddy stays fully usable offline. Sync writes JSON snapshots into your selected iCloud Drive folder.")
+                        Text("Maddy stays fully usable offline. Backend task sync can run first, folder sync remains available as fallback.")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundStyle(AppTheme.textSecondary)
                     }

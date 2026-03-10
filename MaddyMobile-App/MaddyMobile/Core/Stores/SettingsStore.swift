@@ -66,6 +66,9 @@ final class SettingsStore: ObservableObject {
         var showTaskCalendarEntries: Bool?
         var iCalSubscriptions: [ICalSubscription]?
         var visibleTabRawValues: [String]?
+        var backendSyncEnabled: Bool?
+        var backendBaseURL: String?
+        var backendClientDeviceID: String?
     }
 
     struct CloudSnapshot: Codable {
@@ -79,6 +82,61 @@ final class SettingsStore: ObservableObject {
         var showICalCalendarEvents: Bool?
         var showTaskCalendarEntries: Bool?
         var visibleTabRawValues: [String]?
+        var backendSyncEnabled: Bool?
+        var backendBaseURL: String?
+        var backendClientDeviceID: String?
+    }
+
+    struct SharedSettingsSnapshot: Codable {
+        var accentHex: String
+        var soundEnabled: Bool
+        var dailyTaskCount: Int
+        var dailySummaryEnabled: Bool
+        var modifiedAt: Date
+    }
+
+    struct PlatformSettingsSnapshot: Codable {
+        var exportPlaceholderEnabled: Bool
+        var visibleTabRawValues: [String]
+        var backendSyncEnabled: Bool
+        var backendBaseURL: String
+        var backendClientDeviceID: String
+        var modifiedAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case exportPlaceholderEnabled
+            case visibleTabRawValues
+            case backendSyncEnabled
+            case backendBaseURL
+            case backendClientDeviceID
+            case modifiedAt
+        }
+
+        init(
+            exportPlaceholderEnabled: Bool,
+            visibleTabRawValues: [String],
+            backendSyncEnabled: Bool,
+            backendBaseURL: String,
+            backendClientDeviceID: String,
+            modifiedAt: Date
+        ) {
+            self.exportPlaceholderEnabled = exportPlaceholderEnabled
+            self.visibleTabRawValues = visibleTabRawValues
+            self.backendSyncEnabled = backendSyncEnabled
+            self.backendBaseURL = backendBaseURL
+            self.backendClientDeviceID = backendClientDeviceID
+            self.modifiedAt = modifiedAt
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            exportPlaceholderEnabled = try c.decodeIfPresent(Bool.self, forKey: .exportPlaceholderEnabled) ?? false
+            visibleTabRawValues = try c.decodeIfPresent([String].self, forKey: .visibleTabRawValues) ?? MobileTab.orderedCases.map(\.rawValue)
+            backendSyncEnabled = try c.decodeIfPresent(Bool.self, forKey: .backendSyncEnabled) ?? false
+            backendBaseURL = try c.decodeIfPresent(String.self, forKey: .backendBaseURL) ?? "http://127.0.0.1:4000/v1"
+            backendClientDeviceID = try c.decodeIfPresent(String.self, forKey: .backendClientDeviceID) ?? "mobile-\(UUID().uuidString.lowercased())"
+            modifiedAt = try c.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? .distantPast
+        }
     }
 
     struct CalendarSyncSnapshot: Codable {
@@ -125,6 +183,18 @@ final class SettingsStore: ObservableObject {
             persist()
             onICloudSyncPreferenceChanged?(iCloudSyncEnabled)
         }
+    }
+
+    @Published var backendSyncEnabled: Bool {
+        didSet { handleSyncedPreferenceMutation() }
+    }
+
+    @Published var backendBaseURL: String {
+        didSet { handleSyncedPreferenceMutation() }
+    }
+
+    @Published var backendClientDeviceID: String {
+        didSet { handleSyncedPreferenceMutation() }
     }
 
     @Published var showGoogleCalendarEvents: Bool {
@@ -189,6 +259,9 @@ final class SettingsStore: ObservableObject {
             showTaskCalendarEntries = loaded.showTaskCalendarEntries ?? true
             iCalSubscriptions = loaded.iCalSubscriptions ?? []
             visibleTabRawValues = Self.normalizedVisibleTabRawValues(loaded.visibleTabRawValues ?? MobileTab.orderedCases.map(\.rawValue))
+            backendSyncEnabled = loaded.backendSyncEnabled ?? false
+            backendBaseURL = loaded.backendBaseURL ?? "http://127.0.0.1:4000/v1"
+            backendClientDeviceID = loaded.backendClientDeviceID ?? "mobile-\(UUID().uuidString.lowercased())"
         } else if let legacy = storage.loadIfPresent(LegacyState.self, from: fileName) {
             accentHex = legacy.accentHex
             soundEnabled = legacy.soundEnabled
@@ -205,6 +278,9 @@ final class SettingsStore: ObservableObject {
             showTaskCalendarEntries = true
             iCalSubscriptions = []
             visibleTabRawValues = MobileTab.orderedCases.map(\.rawValue)
+            backendSyncEnabled = false
+            backendBaseURL = "http://127.0.0.1:4000/v1"
+            backendClientDeviceID = "mobile-\(UUID().uuidString.lowercased())"
         } else {
             accentHex = "#FF7A2F"
             soundEnabled = true
@@ -221,6 +297,9 @@ final class SettingsStore: ObservableObject {
             showTaskCalendarEntries = true
             iCalSubscriptions = []
             visibleTabRawValues = MobileTab.orderedCases.map(\.rawValue)
+            backendSyncEnabled = false
+            backendBaseURL = "http://127.0.0.1:4000/v1"
+            backendClientDeviceID = "mobile-\(UUID().uuidString.lowercased())"
         }
 
         if syncFolderBookmark != nil, iCloudSyncEnabled == false {
@@ -267,8 +346,59 @@ final class SettingsStore: ObservableObject {
             showGoogleCalendarEvents: showGoogleCalendarEvents,
             showICalCalendarEvents: showICalCalendarEvents,
             showTaskCalendarEntries: showTaskCalendarEntries,
-            visibleTabRawValues: visibleTabRawValues
+            visibleTabRawValues: visibleTabRawValues,
+            backendSyncEnabled: backendSyncEnabled,
+            backendBaseURL: backendBaseURL,
+            backendClientDeviceID: backendClientDeviceID
         )
+    }
+
+    func sharedSettingsSnapshot() -> SharedSettingsSnapshot {
+        SharedSettingsSnapshot(
+            accentHex: accentHex,
+            soundEnabled: soundEnabled,
+            dailyTaskCount: dailyTaskCount,
+            dailySummaryEnabled: dailySummaryEnabled,
+            modifiedAt: lastModifiedAt
+        )
+    }
+
+    func applySharedSettingsSnapshot(_ snapshot: SharedSettingsSnapshot) {
+        guard snapshot.modifiedAt > lastModifiedAt else { return }
+
+        isApplyingCloudSnapshot = true
+        accentHex = snapshot.accentHex
+        soundEnabled = snapshot.soundEnabled
+        dailyTaskCount = min(8, max(1, snapshot.dailyTaskCount))
+        dailySummaryEnabled = snapshot.dailySummaryEnabled
+        lastModifiedAt = snapshot.modifiedAt
+        isApplyingCloudSnapshot = false
+        persist()
+    }
+
+    func platformSettingsSnapshot() -> PlatformSettingsSnapshot {
+        PlatformSettingsSnapshot(
+            exportPlaceholderEnabled: exportPlaceholderEnabled,
+            visibleTabRawValues: visibleTabRawValues,
+            backendSyncEnabled: backendSyncEnabled,
+            backendBaseURL: backendBaseURL,
+            backendClientDeviceID: backendClientDeviceID,
+            modifiedAt: lastModifiedAt
+        )
+    }
+
+    func applyPlatformSettingsSnapshot(_ snapshot: PlatformSettingsSnapshot) {
+        guard snapshot.modifiedAt > lastModifiedAt else { return }
+
+        isApplyingCloudSnapshot = true
+        exportPlaceholderEnabled = snapshot.exportPlaceholderEnabled
+        visibleTabRawValues = Self.normalizedVisibleTabRawValues(snapshot.visibleTabRawValues)
+        backendSyncEnabled = snapshot.backendSyncEnabled
+        backendBaseURL = snapshot.backendBaseURL
+        backendClientDeviceID = snapshot.backendClientDeviceID
+        lastModifiedAt = snapshot.modifiedAt
+        isApplyingCloudSnapshot = false
+        persist()
     }
 
     func applyCloudSnapshot(_ snapshot: CloudSnapshot) {
@@ -284,6 +414,9 @@ final class SettingsStore: ObservableObject {
         showICalCalendarEvents = snapshot.showICalCalendarEvents ?? showICalCalendarEvents
         showTaskCalendarEntries = snapshot.showTaskCalendarEntries ?? showTaskCalendarEntries
         visibleTabRawValues = Self.normalizedVisibleTabRawValues(snapshot.visibleTabRawValues ?? visibleTabRawValues)
+        backendSyncEnabled = snapshot.backendSyncEnabled ?? backendSyncEnabled
+        backendBaseURL = snapshot.backendBaseURL ?? backendBaseURL
+        backendClientDeviceID = snapshot.backendClientDeviceID ?? backendClientDeviceID
         lastModifiedAt = snapshot.modifiedAt
         isApplyingCloudSnapshot = false
         persist()
@@ -414,6 +547,10 @@ final class SettingsStore: ObservableObject {
         iCalSubscriptions[index].lastError = error
     }
 
+    func regenerateBackendClientDeviceID() {
+        backendClientDeviceID = "mobile-\(UUID().uuidString.lowercased())"
+    }
+
     private func normalizeSubscriptionURL(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else { return "" }
@@ -457,7 +594,10 @@ final class SettingsStore: ObservableObject {
                 showICalCalendarEvents: showICalCalendarEvents,
                 showTaskCalendarEntries: showTaskCalendarEntries,
                 iCalSubscriptions: iCalSubscriptions,
-                visibleTabRawValues: visibleTabRawValues
+                visibleTabRawValues: visibleTabRawValues,
+                backendSyncEnabled: backendSyncEnabled,
+                backendBaseURL: backendBaseURL,
+                backendClientDeviceID: backendClientDeviceID
             ),
             to: fileName
         )

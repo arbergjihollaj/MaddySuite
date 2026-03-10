@@ -107,6 +107,6 @@ Key variables:
 - `docs/module-boundaries.md`
 - `docs/data-model.md`
 - `docs/sync-model.md`
+- `docs/sync-migration-notes.md`
 - `docs/migration-plan.md`
 - `openapi/openapi.yaml`
-

@@ -11,6 +11,14 @@ import { AppLoggerService } from './common/logger/app-logger.service';
 
 async function bootstrap() {
   const env = getEnv();
+
+  if (env.AUTH_MODE === 'dev') {
+    // Explicit startup signal for local/dev environments.
+    // Production is already blocked by env validation.
+    // eslint-disable-next-line no-console
+    console.warn('[SECURITY] AUTH_MODE=dev active: only use in local development/test environments.');
+  }
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({

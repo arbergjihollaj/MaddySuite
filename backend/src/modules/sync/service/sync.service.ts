@@ -28,9 +28,10 @@ export class SyncService {
   ) {}
 
   async push(user: AuthenticatedUser, dto: SyncPushDto) {
+    const clientDeviceId = this.requireClientDeviceId(dto.clientDeviceId);
     const device = await this.devicesService.register({
       userId: user.id,
-      clientDeviceId: dto.deviceId,
+      clientDeviceId,
       platform: undefined,
       appVersion: undefined,
     });
@@ -73,7 +74,10 @@ export class SyncService {
     }
 
     return {
-      deviceId: device.id,
+      clientDeviceId,
+      serverDeviceId: device.id,
+      // Deprecated legacy alias. Use `clientDeviceId` instead.
+      deviceId: clientDeviceId,
       accepted: dto.mutations.length,
       results,
       serverTimestamp: new Date().toISOString(),
@@ -81,7 +85,7 @@ export class SyncService {
   }
 
   async pull(user: AuthenticatedUser, query: SyncPullQueryDto) {
-    const cursor = BigInt(query.cursor ?? '0');
+    const cursor = this.parseCursor(query.cursor ?? '0', 'cursor');
     const limit = query.limit ?? 200;
 
     const changes = await this.changesRepository.pull(user.id, cursor, limit);
@@ -105,14 +109,15 @@ export class SyncService {
   }
 
   async ack(user: AuthenticatedUser, dto: SyncAckDto) {
+    const clientDeviceId = this.requireClientDeviceId(dto.clientDeviceId);
     const device = await this.devicesService.register({
       userId: user.id,
-      clientDeviceId: dto.deviceId,
+      clientDeviceId,
       platform: undefined,
       appVersion: undefined,
     });
 
-    const cursorValue = BigInt(dto.cursor);
+    const cursorValue = this.parseCursor(dto.cursor, 'cursor');
     const row = await this.syncCursorsRepository.upsert({
       userId: user.id,
       deviceId: device.id,
@@ -120,7 +125,10 @@ export class SyncService {
     });
 
     return {
-      deviceId: dto.deviceId,
+      clientDeviceId,
+      serverDeviceId: device.id,
+      // Deprecated legacy alias. Use `clientDeviceId` instead.
+      deviceId: clientDeviceId,
       cursor: row.cursor.toString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -176,6 +184,10 @@ export class SyncService {
       throw new BadRequestException('Task mutation requires entityId or payload.id');
     }
 
+    if (payload.status === 'deleted') {
+      throw new BadRequestException('Task delete must use operation=delete');
+    }
+
     const clientUpdatedAt = new Date(mutation.timestamp);
     if (Number.isNaN(clientUpdatedAt.getTime())) {
       throw new BadRequestException('Invalid mutation timestamp');
@@ -214,10 +226,10 @@ export class SyncService {
       dailyDateKey: payload.dailyDateKey,
       completedAt: payload.completedAt ? new Date(payload.completedAt) : undefined,
       clientUpdatedAt,
-      deletedAt: payload.status === 'deleted' ? new Date() : undefined,
+      deletedAt: undefined,
     };
 
-    const { task, applied } = await this.tasksRepository.upsertWithLww({
+    const { task, applied, operation } = await this.tasksRepository.upsertWithLww({
       userId,
       id,
       data,
@@ -225,12 +237,12 @@ export class SyncService {
       clientUpdatedAt,
     });
 
-    if (applied) {
+    if (applied && operation) {
       await this.changesRepository.append({
         userId,
         entityType: ChangeEntityType.TASK,
         entityId: task.id,
-        operation: task.deletedAt ? 'DELETED' : task.createdAt.getTime() === task.updatedAt.getTime() ? 'CREATED' : 'UPDATED',
+        operation: operation === 'created' ? 'CREATED' : 'UPDATED',
         payload: toTaskEntity(task) as Prisma.JsonObject,
         sourceDeviceId,
         sourceMutationId: mutation.clientMutationId,
@@ -245,6 +257,26 @@ export class SyncService {
       record: toTaskEntity(task),
       reason: applied ? undefined : 'Older client timestamp than server record',
     };
+  }
+
+  private parseCursor(raw: string, field: string): bigint {
+    try {
+      const parsed = BigInt(raw);
+      if (parsed < 0n) {
+        throw new Error(`${field} must be >= 0`);
+      }
+      return parsed;
+    } catch {
+      throw new BadRequestException(`Invalid ${field} value`);
+    }
+  }
+
+  private requireClientDeviceId(value: string): string {
+    const normalized = value.trim();
+    if (normalized.length === 0) {
+      throw new BadRequestException('clientDeviceId is required');
+    }
+    return normalized;
   }
 
   private toEntityType(entityType: SyncEntityTypeDto): ChangeEntityType | undefined {

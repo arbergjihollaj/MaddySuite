@@ -48,6 +48,8 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email ?? undefined,
+      clientDeviceId: rawDeviceId,
+      serverDeviceId: device.id,
       deviceId: device.id,
     };
   }
@@ -98,6 +100,8 @@ export class AuthService {
       id: user.id,
       clerkUserId,
       email: user.email ?? undefined,
+      clientDeviceId: rawDeviceId,
+      serverDeviceId: deviceId,
       deviceId,
     };
   }

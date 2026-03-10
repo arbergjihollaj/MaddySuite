@@ -43,9 +43,11 @@ MaddySuite/
 ### 3) ESP32 Firmware
 
 1. Öffnen:
-   - `ESP32-Firmware/sketch_mar1c_copy_20260304013237/sketch_mar1c_copy_20260304013237.ino`
+   - `ESP32-Firmware/MaddyDisplayFirmware/MaddyDisplayFirmware.ino`
 2. Board/Port in Arduino IDE auswählen.
 3. Hochladen.
+4. Parser-/Stabilitätstests:
+   - `ESP32-Firmware/TESTING.md`
 
 ## ESP Display Eckdaten
 
@@ -73,4 +75,3 @@ Beispiele:
 
 Für echte iCloud/CloudKit-Features auf iOS/macOS ist in der Regel ein **bezahltes Apple Developer Program Team** nötig.  
 Mit Personal Team funktioniert Signierung lokal, aber bestimmte Capabilities (z. B. iCloud) sind eingeschränkt.
-

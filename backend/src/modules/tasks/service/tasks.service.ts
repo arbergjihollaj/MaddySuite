@@ -58,7 +58,7 @@ export class TasksService {
       entityId: created.id,
       operation: 'CREATED',
       payload: toTaskEntity(created),
-      sourceDeviceId: user.deviceId,
+      sourceDeviceId: user.serverDeviceId ?? user.deviceId,
     });
 
     return toTaskEntity(created);
@@ -68,6 +68,24 @@ export class TasksService {
     const existing = await this.tasksRepository.findByIdForUser(id, user.id);
     if (!existing) {
       throw new NotFoundException('Task not found');
+    }
+
+    if (dto.status === 'deleted') {
+      const deleted = await this.tasksRepository.softDelete(
+        id,
+        user.id,
+        dto.clientUpdatedAt ? new Date(dto.clientUpdatedAt) : new Date(),
+      );
+
+      await this.changesService.recordTaskChange({
+        userId: user.id,
+        entityId: deleted.id,
+        operation: 'DELETED',
+        payload: toTaskEntity(deleted),
+        sourceDeviceId: user.serverDeviceId ?? user.deviceId,
+      });
+
+      return toTaskEntity(deleted);
     }
 
     const updated = await this.tasksRepository.update(id, user.id, {
@@ -83,7 +101,7 @@ export class TasksService {
       dailyDateKey: dto.dailyDateKey,
       completedAt: dto.completedAt ? new Date(dto.completedAt) : undefined,
       clientUpdatedAt: dto.clientUpdatedAt ? new Date(dto.clientUpdatedAt) : new Date(),
-      deletedAt: dto.status === 'deleted' ? new Date() : undefined,
+      deletedAt: undefined,
     });
 
     await this.changesService.recordTaskChange({
@@ -91,7 +109,7 @@ export class TasksService {
       entityId: updated.id,
       operation: updated.status === TaskStatus.DELETED ? 'DELETED' : 'UPDATED',
       payload: toTaskEntity(updated),
-      sourceDeviceId: user.deviceId,
+      sourceDeviceId: user.serverDeviceId ?? user.deviceId,
     });
 
     return toTaskEntity(updated);
@@ -110,7 +128,7 @@ export class TasksService {
       entityId: updated.id,
       operation: 'DELETED',
       payload: toTaskEntity(updated),
-      sourceDeviceId: user.deviceId,
+      sourceDeviceId: user.serverDeviceId ?? user.deviceId,
     });
 
     return { ok: true };

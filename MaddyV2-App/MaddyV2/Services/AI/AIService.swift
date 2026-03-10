@@ -90,6 +90,7 @@ final class AIService: ObservableObject {
 
     private var requestTask: Task<Void, Never>?
     private var dayTicker: AnyCancellable?
+    private let streamingRenderer = AIStreamingRenderer()
 
     private var fallbackNoticeToken: Int = 0
 
@@ -806,23 +807,15 @@ final class AIService: ObservableObject {
         appendMessage(role: .assistant, content: "", mode: mode)
 
         if settings.streamingEnabled {
-            let words = text.split(separator: " ").map(String.init)
-            var staged = ""
+            let checkpoints = await streamingRenderer.streamingCheckpoints(
+                text: text,
+                wordsPerChunk: 20
+            )
 
-            for index in words.indices {
+            for partial in checkpoints {
                 try Task.checkCancellation()
-
-                if staged.isEmpty {
-                    staged = words[index]
-                } else {
-                    staged += " \(words[index])"
-                }
-
-                let checkpoint = index % 10 == 0 || index == words.count - 1
-                if checkpoint {
-                    updateLastAssistantMessage(mode: mode, content: staged)
-                    try await Task.sleep(nanoseconds: 20_000_000)
-                }
+                updateLastAssistantMessage(mode: mode, content: partial)
+                try await Task.sleep(nanoseconds: 40_000_000)
             }
         }
 
@@ -1104,5 +1097,35 @@ final class AIService: ObservableObject {
 
         array.insert(contentsOf: items, at: max(0, min(insertIndex, array.count)))
         return array
+    }
+}
+
+actor AIStreamingRenderer {
+    func streamingCheckpoints(text: String, wordsPerChunk: Int) -> [String] {
+        let sanitizedChunk = max(1, wordsPerChunk)
+        let words = text.split(separator: " ").map(String.init)
+
+        guard words.isEmpty == false else {
+            return [text]
+        }
+
+        var result: [String] = []
+        result.reserveCapacity((words.count / sanitizedChunk) + 1)
+
+        var staged = ""
+        for index in words.indices {
+            if staged.isEmpty {
+                staged = words[index]
+            } else {
+                staged += " \(words[index])"
+            }
+
+            let checkpoint = index % sanitizedChunk == 0 || index == words.count - 1
+            if checkpoint {
+                result.append(staged)
+            }
+        }
+
+        return result
     }
 }

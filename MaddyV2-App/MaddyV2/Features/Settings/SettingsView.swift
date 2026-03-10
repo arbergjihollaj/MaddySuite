@@ -609,6 +609,45 @@ struct SettingsView: View {
                     set: { appState.settings.iCloudSyncEnabled = $0 }
                 ))
 
+                Divider().overlay(Color.white.opacity(0.08))
+
+                Toggle("Enable Backend Sync (API)", isOn: Binding(
+                    get: { appState.settings.backendSyncEnabled },
+                    set: { appState.settings.backendSyncEnabled = $0 }
+                ))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Backend Base URL")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+
+                    TextField("http://127.0.0.1:4000/v1", text: Binding(
+                        get: { appState.settings.backendBaseURL },
+                        set: { appState.settings.backendBaseURL = $0 }
+                    ))
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .textFieldStyle(.roundedBorder)
+                }
+
+                HStack(spacing: 8) {
+                    Text("Device ID")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                    Text(appState.settings.backendClientDeviceID)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Button("Regenerate") {
+                        appState.settings.backendClientDeviceID = "mac-\(UUID().uuidString.lowercased())"
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Text("Backend sync is task-focused and runs before folder sync when enabled.")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Sync Folder")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
@@ -673,7 +712,7 @@ struct SettingsView: View {
                         .foregroundStyle(iCloudSyncStatusText.contains("failed") ? .orange : .green)
                 }
 
-                Text("Offline-first: local data stays available. Sync writes JSON snapshots into your chosen iCloud Drive folder.")
+                Text("Offline-first: local data stays available. Backend task sync can run first, folder sync remains the legacy fallback.")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
             }

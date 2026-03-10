@@ -194,9 +194,14 @@ static unsigned long habitDoneAnimDurationMs = 1000;
 // =====================================================
 static const uint16_t RX_LINE_MAX = 360;
 static const uint16_t RX_BYTES_PER_POLL = 192;
+static const uint8_t MAX_STATE_TEXT = 96;
+static const uint8_t MAX_STATUS_TEXT = 24;
+static const uint8_t MAX_HINT_TEXT = 140;
 
 static char inLine[RX_LINE_MAX];
 static uint16_t inLineLen = 0;
+static bool rxDiscardUntilNewline = false;
+static uint32_t rxOverflowCount = 0;
 
 
 // =====================================================
@@ -372,6 +377,14 @@ static bool setIfChangedString(String &dst, const String &src) {
     return true;
   }
   return false;
+}
+
+static bool setIfChangedBoundedString(String &dst, const String &src, uint16_t maxChars) {
+  String bounded = trimCopy(src);
+  if ((int)bounded.length() > (int)maxChars) {
+    bounded = bounded.substring(0, maxChars);
+  }
+  return setIfChangedString(dst, bounded);
 }
 
 static bool setIfChangedInt(int &dst, int src) {
@@ -1296,11 +1309,11 @@ static void handleLine(const String &lineRaw) {
     String payload = line.substring(5);
     String t = fieldAt(payload, 0);
     if (t.length() == 0) t = trimCopy(payload);
-    changed |= setIfChangedString(timeStr, t);
+    changed |= setIfChangedBoundedString(timeStr, t, 8);
 
     String d = fieldAt(payload, 1);
     if (d.length() > 0) {
-      changed |= setIfChangedString(dateStr, d);
+      changed |= setIfChangedBoundedString(dateStr, d, 16);
     }
 
     if (changed) markContentDirty();
@@ -1308,7 +1321,7 @@ static void handleLine(const String &lineRaw) {
   }
 
   if (lower.startsWith("date:")) {
-    if (setIfChangedString(dateStr, trimCopy(line.substring(5)))) {
+    if (setIfChangedBoundedString(dateStr, trimCopy(line.substring(5)), 16)) {
       markContentDirty();
     }
     return;
@@ -1323,9 +1336,9 @@ static void handleLine(const String &lineRaw) {
     String f3 = fieldAt(payload, 3);
     String f4 = fieldAt(payload, 4);
 
-    if (f0.length()) changed |= setIfChangedString(musicState, toLowerCopy(f0));
-    if (f1.length()) changed |= setIfChangedString(musicArtist, f1);
-    if (f2.length()) changed |= setIfChangedString(musicTitle, f2);
+    if (f0.length()) changed |= setIfChangedBoundedString(musicState, toLowerCopy(f0), MAX_STATUS_TEXT);
+    if (f1.length()) changed |= setIfChangedBoundedString(musicArtist, f1, MAX_STATE_TEXT);
+    if (f2.length()) changed |= setIfChangedBoundedString(musicTitle, f2, MAX_STATE_TEXT);
 
     long pos = (f3.length() ? toLongOr(f3, -1) : -1);
     long dur = (f4.length() ? toLongOr(f4, -1) : -1);
@@ -1348,7 +1361,7 @@ static void handleLine(const String &lineRaw) {
     String f2 = fieldAt(payload, 2);
     String f3 = fieldAt(payload, 3);
 
-    if (f0.length()) changed |= setIfChangedString(pomoPhase, toLowerCopy(f0));
+    if (f0.length()) changed |= setIfChangedBoundedString(pomoPhase, toLowerCopy(f0), MAX_STATUS_TEXT);
     changed |= setIfChangedInt(pomoRemaining, (int)clampLong(toLongOr(f1, pomoRemaining), 0, 86399));
     changed |= setIfChangedInt(pomoTotal, (int)clampLong(toLongOr(f2, pomoTotal), 1, 86399));
 
@@ -1404,10 +1417,10 @@ static void handleLine(const String &lineRaw) {
     String f4 = fieldAt(payload, 4);
     String f5 = fieldAt(payload, 5);
 
-    if (f0.length()) changed |= setIfChangedString(selectedHabitId, f0);
-    if (f1.length()) changed |= setIfChangedString(selectedHabitTitle, f1);
-    if (f2.length()) changed |= setIfChangedString(selectedHabitSymbol, f2);
-    if (f3.length()) changed |= setIfChangedString(selectedHabitColor, f3);
+    if (f0.length()) changed |= setIfChangedBoundedString(selectedHabitId, f0, MAX_STATE_TEXT);
+    if (f1.length()) changed |= setIfChangedBoundedString(selectedHabitTitle, f1, MAX_STATE_TEXT);
+    if (f2.length()) changed |= setIfChangedBoundedString(selectedHabitSymbol, f2, MAX_STATUS_TEXT);
+    if (f3.length()) changed |= setIfChangedBoundedString(selectedHabitColor, f3, MAX_STATUS_TEXT);
     if (f4.length()) changed |= setIfChangedInt(selectedHabitStreak, (int)clampLong(toLongOr(f4, selectedHabitStreak), 0, 9999));
     if (f5.length()) {
       bool done = parseBoolLoose(f5, selectedHabitDoneToday != 0);
@@ -1432,8 +1445,8 @@ static void handleLine(const String &lineRaw) {
     String payload = line.substring(6);
     String f0 = fieldAt(payload, 0);
     String f1 = fieldAt(payload, 1);
-    if (f0.length()) changed |= setIfChangedString(coachStatus, toLowerCopy(f0));
-    if (f1.length()) changed |= setIfChangedString(coachHint, f1);
+    if (f0.length()) changed |= setIfChangedBoundedString(coachStatus, toLowerCopy(f0), MAX_STATUS_TEXT);
+    if (f1.length()) changed |= setIfChangedBoundedString(coachHint, f1, MAX_HINT_TEXT);
     if (changed) markContentDirty();
     return;
   }
@@ -1501,7 +1514,7 @@ static void handleLine(const String &lineRaw) {
     changed |= setIfChangedInt(settingsBrightness, (int)clampLong(toLongOr(fieldAt(payload, 0), settingsBrightness), 0, 100));
     changed |= setIfChangedInt(settingsVolume, (int)clampLong(toLongOr(fieldAt(payload, 1), settingsVolume), 0, 100));
     String u = fieldAt(payload, 2);
-    if (u.length()) changed |= setIfChangedString(settingsUsb, toLowerCopy(u));
+    if (u.length()) changed |= setIfChangedBoundedString(settingsUsb, toLowerCopy(u), MAX_STATUS_TEXT);
     if (changed) markContentDirty();
     return;
   }
@@ -1520,6 +1533,13 @@ static void serialPoll() {
     char c = (char)Serial.read();
     processed++;
 
+    if (rxDiscardUntilNewline) {
+      if (c == '\n') {
+        rxDiscardUntilNewline = false;
+      }
+      continue;
+    }
+
     if (c == '\n') {
       inLine[inLineLen] = '\0';
       handleLine(String(inLine));
@@ -1529,7 +1549,9 @@ static void serialPoll() {
         inLine[inLineLen++] = c;
       } else {
         inLineLen = 0;
-        dbgLastError = "RX overflow";
+        rxDiscardUntilNewline = true;
+        rxOverflowCount++;
+        dbgLastError = "RX overflow (" + String(rxOverflowCount) + ")";
       }
     }
   }

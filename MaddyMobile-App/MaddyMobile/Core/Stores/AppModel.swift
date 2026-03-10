@@ -17,7 +17,7 @@ final class AppModel: ObservableObject {
 
         var title: String {
             switch self {
-            case .checking: return "Checking Folder Sync"
+            case .checking: return "Checking Sync"
             case .active: return "Sync Active"
             case .syncing: return "Syncing"
             case .unavailable: return "Folder Unavailable"
@@ -29,11 +29,11 @@ final class AppModel: ObservableObject {
         var subtitle: String {
             switch self {
             case .checking:
-                return "Validating your shared iCloud Drive folder."
+                return "Validating configured sync channels."
             case .active:
-                return "Your data syncs through JSON files while staying available offline."
+                return "Your data syncs while staying available offline."
             case .syncing:
-                return "Merging local and folder data."
+                return "Merging local, backend, and folder data."
             case .unavailable(let message):
                 return message
             case .disabled:
@@ -72,18 +72,24 @@ final class AppModel: ObservableObject {
         settingsStore.syncFolderDisplayName ?? "No folder selected"
     }
 
+    private let storage: LocalJSONStorage
     private var pendingSyncTask: Task<Void, Never>?
     private var periodicSyncTask: Task<Void, Never>?
     private var dailyLoopTask: Task<Void, Never>?
     private var isSyncing = false
+    private var backendTaskSyncState: BackendTaskSyncState
+
+    private let backendTaskSyncMetaFile = "backend_task_sync_meta.json"
 
     init(storage: LocalJSONStorage = .shared) {
+        self.storage = storage
         settingsStore = SettingsStore(storage: storage)
         tasksStore = TasksStore(storage: storage)
         habitStore = HabitStore(storage: storage)
         focusStore = FocusStore(storage: storage)
         gamificationStore = GamificationStore(storage: storage)
         calendarStore = CalendarStore(settingsStore: settingsStore, tasksStore: tasksStore)
+        backendTaskSyncState = storage.load(BackendTaskSyncState.self, from: backendTaskSyncMetaFile, fallback: .empty)
 
         wire()
         startPeriodicSyncLoop()
@@ -115,7 +121,11 @@ final class AppModel: ObservableObject {
 
     func clearSyncFolder() {
         settingsStore.clearSyncFolder()
-        syncStatus = .unavailable("Select an iCloud Drive folder to enable sync.")
+        if settingsStore.backendSyncEnabled {
+            scheduleSync(immediate: true)
+        } else {
+            syncStatus = .unavailable("Select an iCloud Drive folder to enable sync.")
+        }
     }
 
     private func wire() {
@@ -157,7 +167,7 @@ final class AppModel: ObservableObject {
             if enabled {
                 self.scheduleSync(immediate: true)
             } else {
-                self.syncStatus = .disabled
+                self.syncStatus = self.isAnySyncEnabled ? .active : .disabled
             }
         }
 
@@ -165,12 +175,12 @@ final class AppModel: ObservableObject {
     }
 
     private func bootstrapSync() async {
-        if settingsStore.iCloudSyncEnabled == false {
+        if isAnySyncEnabled == false {
             syncStatus = .disabled
             return
         }
 
-        if settingsStore.hasSyncFolder == false {
+        if settingsStore.iCloudSyncEnabled, settingsStore.hasSyncFolder == false {
             syncStatus = .unavailable("Select an iCloud Drive folder to enable sync.")
             return
         }
@@ -191,7 +201,7 @@ final class AppModel: ObservableObject {
     }
 
     private func periodicSyncTick() async {
-        guard settingsStore.iCloudSyncEnabled else { return }
+        guard isAnySyncEnabled else { return }
         scheduleSync(immediate: true)
     }
 
@@ -240,7 +250,7 @@ final class AppModel: ObservableObject {
     }
 
     private func scheduleSync(immediate: Bool) {
-        guard settingsStore.iCloudSyncEnabled else {
+        guard isAnySyncEnabled else {
             syncStatus = .disabled
             return
         }
@@ -257,7 +267,7 @@ final class AppModel: ObservableObject {
     }
 
     private func performSyncCycle() async {
-        guard settingsStore.iCloudSyncEnabled else {
+        guard isAnySyncEnabled else {
             syncStatus = .disabled
             return
         }
@@ -267,9 +277,42 @@ final class AppModel: ObservableObject {
         syncStatus = .syncing
         defer { isSyncing = false }
 
+        var success = false
+        var failures: [String] = []
+
+        if settingsStore.backendSyncEnabled {
+            let backendSucceeded = await runBackendTaskSync()
+            success = success || backendSucceeded
+            if backendSucceeded == false {
+                failures.append("Backend sync failed")
+            }
+        }
+
+        if settingsStore.iCloudSyncEnabled {
+            let folderSucceeded = await runFolderSyncCycle()
+            success = success || folderSucceeded
+            if folderSucceeded == false {
+                failures.append("Folder sync failed")
+            }
+        }
+
+        if success {
+            settingsStore.updateLastSuccessfulSync(Date())
+            syncStatus = .active
+        } else {
+            syncStatus = .error(failures.first ?? "Sync failed")
+        }
+    }
+
+    private var isAnySyncEnabled: Bool {
+        settingsStore.iCloudSyncEnabled || settingsStore.backendSyncEnabled
+    }
+
+    @discardableResult
+    private func runFolderSyncCycle() async -> Bool {
         guard let rootURL = settingsStore.resolveSyncFolderURL() else {
             syncStatus = .unavailable("Selected sync folder is no longer accessible.")
-            return
+            return false
         }
 
         let hasSecurityScope = rootURL.startAccessingSecurityScopedResource()
@@ -297,6 +340,15 @@ final class AppModel: ObservableObject {
                 let fileURL = syncFolder.appendingPathComponent(payload.domain.fileName)
                 if let envelope = try loadEnvelope(from: fileURL, using: decoder) {
                     remotePayloads[payload.domain] = envelope
+                    continue
+                }
+
+                for legacyFileName in payload.domain.legacyFileNames {
+                    let legacyURL = syncFolder.appendingPathComponent(legacyFileName)
+                    if let legacyEnvelope = try loadEnvelope(from: legacyURL, using: decoder) {
+                        remotePayloads[payload.domain] = legacyEnvelope
+                        break
+                    }
                 }
             }
 
@@ -313,11 +365,288 @@ final class AppModel: ObservableObject {
                 try saveEnvelope(envelope, to: fileURL, using: encoder)
             }
 
-            settingsStore.updateLastSuccessfulSync(Date())
-            syncStatus = .active
+            return true
         } catch {
-            syncStatus = .error("Folder sync failed. Local data remains safe.")
+            return false
         }
+    }
+
+    @discardableResult
+    private func runBackendTaskSync() async -> Bool {
+        do {
+            let baseURL = try normalizedBackendBaseURL(from: settingsStore.backendBaseURL)
+            let headers = backendHeaders(clientDeviceID: settingsStore.backendClientDeviceID)
+
+            var cursor = backendTaskSyncState.cursor
+            var hasMore = true
+            var guardCount = 0
+
+            while hasMore, guardCount < 20 {
+                guardCount += 1
+                let pull = try await performBackendRequest(
+                    baseURL: baseURL,
+                    path: "sync/pull?cursor=\(cursor)&limit=200",
+                    method: "GET",
+                    headers: headers,
+                    requestBody: Optional<EmptyBody>.none,
+                    responseType: BackendPullResponse.self
+                )
+
+                if pull.changes.isEmpty == false {
+                    applyBackendTaskChanges(pull.changes)
+                }
+
+                cursor = pull.cursor
+                hasMore = pull.hasMore
+            }
+
+            _ = try await performBackendRequest(
+                baseURL: baseURL,
+                path: "sync/ack",
+                method: "POST",
+                headers: headers,
+                requestBody: BackendAckRequest(clientDeviceId: settingsStore.backendClientDeviceID, cursor: cursor),
+                responseType: BackendAckResponse.self
+            )
+
+            let currentPayloads = currentBackendTaskPayloads()
+            let currentSignatures = currentPayloads.reduce(into: [String: String]()) { partial, entry in
+                partial[entry.id.lowercased()] = backendTaskSignature(for: entry)
+            }
+
+            var mutations: [BackendSyncMutation] = []
+            for payload in currentPayloads {
+                let key = payload.id.lowercased()
+                let previous = backendTaskSyncState.taskSignatures[key]
+                let next = currentSignatures[key]
+                if previous != next {
+                    mutations.append(
+                        BackendSyncMutation(
+                            clientMutationId: "upsert-\(key)-\(Int(payload.clientUpdatedAtDate.timeIntervalSince1970))",
+                            entityType: "task",
+                            operation: "upsert",
+                            entityId: payload.id,
+                            timestamp: payload.clientUpdatedAt,
+                            payload: payload
+                        )
+                    )
+                }
+            }
+
+            for key in backendTaskSyncState.taskSignatures.keys where currentSignatures[key] == nil {
+                mutations.append(
+                    BackendSyncMutation(
+                        clientMutationId: "delete-\(key)",
+                        entityType: "task",
+                        operation: "delete",
+                        entityId: key,
+                        timestamp: BackendDateFormatter.shared.string(from: Date()),
+                        payload: nil
+                    )
+                )
+            }
+
+            if mutations.isEmpty == false {
+                for chunk in mutations.chunked(into: 100) {
+                    _ = try await performBackendRequest(
+                        baseURL: baseURL,
+                        path: "sync/push",
+                        method: "POST",
+                        headers: headers,
+                        requestBody: BackendPushRequest(clientDeviceId: settingsStore.backendClientDeviceID, mutations: chunk),
+                        responseType: BackendPushResponse.self
+                    )
+                }
+            }
+
+            backendTaskSyncState.cursor = cursor
+            backendTaskSyncState.taskSignatures = currentBackendTaskPayloads().reduce(into: [String: String]()) { partial, entry in
+                partial[entry.id.lowercased()] = backendTaskSignature(for: entry)
+            }
+            persistBackendTaskSyncState()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func persistBackendTaskSyncState() {
+        storage.save(backendTaskSyncState, to: backendTaskSyncMetaFile)
+    }
+
+    private func applyBackendTaskChanges(_ changes: [BackendChange]) {
+        guard changes.isEmpty == false else { return }
+
+        var snapshot = tasksStore.cloudSnapshot()
+        var active = snapshot.tasks
+        var archived = snapshot.archivedTasks
+        var activeByID = Dictionary(uniqueKeysWithValues: active.enumerated().map { ($0.element.id, $0.offset) })
+        var archivedByTaskID = Dictionary(uniqueKeysWithValues: archived.enumerated().map { ($0.element.task.id, $0.offset) })
+
+        for change in changes where change.entityType == "task" {
+            guard let payload = change.payload, let task = payload.toTaskItem() else { continue }
+            let id = task.id
+            let removeTask = change.operation == "deleted" || payload.deletedAt != nil || payload.status == "deleted"
+
+            if removeTask {
+                if let index = activeByID[id] {
+                    active.remove(at: index)
+                    activeByID = Dictionary(uniqueKeysWithValues: active.enumerated().map { ($0.element.id, $0.offset) })
+                }
+                if let index = archivedByTaskID[id] {
+                    archived.remove(at: index)
+                    archivedByTaskID = Dictionary(uniqueKeysWithValues: archived.enumerated().map { ($0.element.task.id, $0.offset) })
+                }
+                continue
+            }
+
+            if task.status == .done || task.status == .missed {
+                if let index = activeByID[id] {
+                    active.remove(at: index)
+                    activeByID = Dictionary(uniqueKeysWithValues: active.enumerated().map { ($0.element.id, $0.offset) })
+                }
+                let archivedEntry = ArchivedTaskItem(
+                    id: archived.first(where: { $0.task.id == id })?.id ?? UUID(),
+                    task: task,
+                    archivedAt: archived.first(where: { $0.task.id == id })?.archivedAt ?? Date()
+                )
+                if let index = archivedByTaskID[id] {
+                    archived[index] = archivedEntry
+                } else {
+                    archived.insert(archivedEntry, at: 0)
+                }
+                archivedByTaskID = Dictionary(uniqueKeysWithValues: archived.enumerated().map { ($0.element.task.id, $0.offset) })
+            } else {
+                if let index = archivedByTaskID[id] {
+                    archived.remove(at: index)
+                    archivedByTaskID = Dictionary(uniqueKeysWithValues: archived.enumerated().map { ($0.element.task.id, $0.offset) })
+                }
+                if let index = activeByID[id] {
+                    active[index] = task
+                } else {
+                    active.append(task)
+                }
+                activeByID = Dictionary(uniqueKeysWithValues: active.enumerated().map { ($0.element.id, $0.offset) })
+            }
+        }
+
+        snapshot.tasks = active
+        snapshot.archivedTasks = archived
+        snapshot.modifiedAt = Date()
+        tasksStore.applyCloudSnapshot(snapshot)
+    }
+
+    private func currentBackendTaskPayloads() -> [BackendTaskPayload] {
+        var records: [UUID: TaskItem] = [:]
+        for task in tasksStore.tasks {
+            records[task.id] = task
+        }
+        for archived in tasksStore.archivedTasks {
+            let candidate = archived.task
+            if let existing = records[candidate.id] {
+                if candidate.updatedAt > existing.updatedAt {
+                    records[candidate.id] = candidate
+                }
+            } else {
+                records[candidate.id] = candidate
+            }
+        }
+        return records.values.map(BackendTaskPayload.init(task:))
+    }
+
+    private func backendTaskSignature(for payload: BackendTaskPayload) -> String {
+        let duePart = payload.dueAt ?? "-"
+        let completedPart = payload.completedAt ?? "-"
+        let dailyPart = payload.dailyDateKey ?? "-"
+        let tags = payload.tags.sorted().joined(separator: ",")
+        let skills = payload.mappedSkills.sorted().joined(separator: ",")
+        return [
+            payload.id.lowercased(),
+            payload.title,
+            payload.status,
+            payload.difficulty,
+            payload.priority,
+            duePart,
+            completedPart,
+            dailyPart,
+            tags,
+            skills,
+            payload.isDailyTask ? "1" : "0",
+            payload.isRequiredDailyTask ? "1" : "0",
+            payload.clientUpdatedAt
+        ].joined(separator: "|")
+    }
+
+    private func normalizedBackendBaseURL(from raw: String) throws -> URL {
+        var trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            trimmed = "http://127.0.0.1:4000/v1"
+        }
+        if trimmed.hasPrefix("http://") == false, trimmed.hasPrefix("https://") == false {
+            trimmed = "http://\(trimmed)"
+        }
+        guard var url = URL(string: trimmed) else {
+            throw URLError(.badURL)
+        }
+        if url.path.isEmpty || url.path == "/" {
+            url.append(path: "v1")
+        }
+        return url
+    }
+
+    private func backendHeaders(clientDeviceID: String) -> [String: String] {
+        [
+            "Content-Type": "application/json",
+            "x-device-id": clientDeviceID,
+            "x-user-id": "00000000-0000-0000-0000-000000000001",
+            "x-user-email": "dev@example.com",
+        ]
+    }
+
+    private func performBackendRequest<RequestBody: Encodable, ResponseBody: Decodable>(
+        baseURL: URL,
+        path: String,
+        method: String,
+        headers: [String: String],
+        requestBody: RequestBody?,
+        responseType: ResponseBody.Type
+    ) async throws -> ResponseBody {
+        let normalizedPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        let split = normalizedPath.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        let pathOnly = String(split.first ?? "")
+        let query = split.count > 1 ? String(split[1]) : nil
+
+        var url = baseURL
+        for component in pathOnly.split(separator: "/") {
+            url.append(path: String(component))
+        }
+        if let query, query.isEmpty == false {
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            components?.percentEncodedQuery = query
+            if let queried = components?.url {
+                url = queried
+            }
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.timeoutInterval = 20
+        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+
+        if let requestBody {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            request.httpBody = try encoder.encode(requestBody)
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(ResponseBody.self, from: data)
     }
 
     private func makeLocalPayloads(using encoder: JSONEncoder) throws -> [DomainPayload] {
@@ -325,7 +654,8 @@ final class AppModel: ObservableObject {
         let habitSnapshot = habitStore.cloudSnapshot()
         let focusSnapshot = focusStore.cloudSnapshot()
         let gameSnapshot = gamificationStore.cloudSnapshot()
-        let settingsSnapshot = settingsStore.cloudSnapshot()
+        let sharedSettingsSnapshot = settingsStore.sharedSettingsSnapshot()
+        let platformSettingsSnapshot = settingsStore.platformSettingsSnapshot()
         let calendarSnapshot = settingsStore.calendarSyncSnapshot()
 
         return [
@@ -333,7 +663,8 @@ final class AppModel: ObservableObject {
             DomainPayload(domain: .habits, modifiedAt: habitSnapshot.modifiedAt, payloadData: try encoder.encode(macHabitsPayload())),
             DomainPayload(domain: .focus, modifiedAt: focusSnapshot.modifiedAt, payloadData: try encoder.encode(macFocusPayload())),
             DomainPayload(domain: .gamification, modifiedAt: gameSnapshot.modifiedAt, payloadData: try encoder.encode(gameSnapshot)),
-            DomainPayload(domain: .settings, modifiedAt: settingsSnapshot.modifiedAt, payloadData: try encoder.encode(settingsSnapshot)),
+            DomainPayload(domain: .sharedSettings, modifiedAt: sharedSettingsSnapshot.modifiedAt, payloadData: try encoder.encode(sharedSettingsSnapshot)),
+            DomainPayload(domain: .mobilePlatformSettings, modifiedAt: platformSettingsSnapshot.modifiedAt, payloadData: try encoder.encode(platformSettingsSnapshot)),
             DomainPayload(domain: .calendarSources, modifiedAt: calendarSnapshot.modifiedAt, payloadData: try encoder.encode(calendarSnapshot))
         ]
     }
@@ -383,9 +714,36 @@ final class AppModel: ObservableObject {
                 case .gamification:
                     let snapshot = try decoder.decode(GamificationStore.CloudSnapshot.self, from: envelope.payloadData)
                     gamificationStore.applyCloudSnapshot(snapshot)
-                case .settings:
-                    let snapshot = try decoder.decode(SettingsStore.CloudSnapshot.self, from: envelope.payloadData)
-                    settingsStore.applyCloudSnapshot(snapshot)
+                case .sharedSettings:
+                    if let shared = try? decoder.decode(SettingsStore.SharedSettingsSnapshot.self, from: envelope.payloadData) {
+                        settingsStore.applySharedSettingsSnapshot(shared)
+                    } else if let legacyMobile = try? decoder.decode(SettingsStore.CloudSnapshot.self, from: envelope.payloadData) {
+                        settingsStore.applySharedSettingsSnapshot(
+                            SettingsStore.SharedSettingsSnapshot(
+                                accentHex: legacyMobile.accentHex,
+                                soundEnabled: legacyMobile.soundEnabled,
+                                dailyTaskCount: min(8, max(1, legacyMobile.dailyTaskCount ?? settingsStore.dailyTaskCount)),
+                                dailySummaryEnabled: legacyMobile.dailySummaryEnabled ?? settingsStore.dailySummaryEnabled,
+                                modifiedAt: legacyMobile.modifiedAt
+                            )
+                        )
+                    } else if let legacyMac = try? decoder.decode(MacLegacySettingsPayload.self, from: envelope.payloadData) {
+                        settingsStore.applySharedSettingsSnapshot(
+                            SettingsStore.SharedSettingsSnapshot(
+                                accentHex: legacyMac.snapshot.accentHex,
+                                soundEnabled: legacyMac.snapshot.focusSoundEnabled,
+                                dailyTaskCount: min(8, max(1, legacyMac.snapshot.dailyTaskCount)),
+                                dailySummaryEnabled: legacyMac.snapshot.dailySummaryEnabled,
+                                modifiedAt: envelope.modifiedAt
+                            )
+                        )
+                    }
+                case .mobilePlatformSettings:
+                    if let platform = try? decoder.decode(SettingsStore.PlatformSettingsSnapshot.self, from: envelope.payloadData) {
+                        settingsStore.applyPlatformSettingsSnapshot(platform)
+                    } else if let legacyMobile = try? decoder.decode(SettingsStore.CloudSnapshot.self, from: envelope.payloadData) {
+                        settingsStore.applyCloudSnapshot(legacyMobile)
+                    }
                 case .calendarSources:
                     let snapshot = try decoder.decode(SettingsStore.CalendarSyncSnapshot.self, from: envelope.payloadData)
                     settingsStore.applyCalendarSyncSnapshot(snapshot)
@@ -435,8 +793,9 @@ final class AppModel: ObservableObject {
     case tasks
     case habits
     case focus
-        case gamification
-    case settings
+    case gamification
+    case sharedSettings
+    case mobilePlatformSettings
     case calendarSources
 
     var fileName: String {
@@ -449,10 +808,23 @@ final class AppModel: ObservableObject {
             return "mac_focus_sync.json"
         case .gamification:
             return "mac_gamification_sync.json"
-        case .settings:
-            return "mobile_settings_sync.json"
+        case .sharedSettings:
+            return "shared_settings_sync.json"
+        case .mobilePlatformSettings:
+            return "mobile_platform_settings_sync.json"
         case .calendarSources:
             return "calendar_sources_sync.json"
+        }
+    }
+
+    var legacyFileNames: [String] {
+        switch self {
+        case .sharedSettings:
+            return ["mac_settings_sync.json"]
+        case .mobilePlatformSettings:
+            return ["mobile_settings_sync.json"]
+        default:
+            return []
         }
     }
 }
@@ -652,5 +1024,181 @@ private struct MacFocusLogEntry: Codable {
             durationMinutes: minutes,
             mode: phase == "custom" ? .custom : .pomodoro
         )
+    }
+}
+
+private struct MacLegacySettingsPayload: Codable {
+    var snapshot: MacLegacySettingsSnapshot
+}
+
+private struct MacLegacySettingsSnapshot: Codable {
+    var accentHex: String
+    var focusSoundEnabled: Bool
+    var dailyTaskCount: Int
+    var dailySummaryEnabled: Bool
+}
+
+private struct BackendTaskSyncState: Codable {
+    var cursor: String
+    var taskSignatures: [String: String]
+
+    static let empty = BackendTaskSyncState(cursor: "0", taskSignatures: [:])
+}
+
+private struct BackendPushRequest: Codable {
+    var clientDeviceId: String
+    var mutations: [BackendSyncMutation]
+}
+
+private struct BackendAckRequest: Codable {
+    var clientDeviceId: String
+    var cursor: String
+}
+
+private struct BackendPushResponse: Codable {
+    var accepted: Int?
+}
+
+private struct BackendAckResponse: Codable {
+    var cursor: String
+}
+
+private struct BackendPullResponse: Codable {
+    var cursor: String
+    var hasMore: Bool
+    var changes: [BackendChange]
+}
+
+private struct BackendChange: Codable {
+    var entityType: String
+    var operation: String
+    var payload: BackendTaskEntity?
+}
+
+private struct BackendSyncMutation: Codable {
+    var clientMutationId: String
+    var entityType: String
+    var operation: String
+    var entityId: String?
+    var timestamp: String
+    var payload: BackendTaskPayload?
+}
+
+private struct BackendTaskPayload: Codable {
+    var id: String
+    var title: String
+    var dueAt: String?
+    var tags: [String]
+    var status: String
+    var difficulty: String
+    var priority: String
+    var mappedSkills: [String]
+    var isDailyTask: Bool
+    var isRequiredDailyTask: Bool
+    var dailyDateKey: String?
+    var completedAt: String?
+    var clientUpdatedAt: String
+
+    init(task: TaskItem) {
+        id = task.id.uuidString.lowercased()
+        title = task.title
+        dueAt = task.dueDate.map { BackendDateFormatter.shared.string(from: $0) }
+        tags = task.tags
+        status = task.status.rawValue
+        difficulty = task.difficulty.rawValue
+        priority = task.priority.rawValue
+        mappedSkills = task.mappedSkills.map(\.rawValue)
+        isDailyTask = task.isDailyTask
+        isRequiredDailyTask = task.isRequiredDailyTask
+        dailyDateKey = task.dailyDateKey
+        completedAt = task.completedAt.map { BackendDateFormatter.shared.string(from: $0) }
+        clientUpdatedAt = BackendDateFormatter.shared.string(from: task.updatedAt)
+    }
+
+    var clientUpdatedAtDate: Date {
+        BackendDateFormatter.date(from: clientUpdatedAt) ?? Date()
+    }
+}
+
+private struct BackendTaskEntity: Codable {
+    var id: String?
+    var title: String?
+    var dueAt: String?
+    var tags: [String]?
+    var status: String?
+    var difficulty: String?
+    var priority: String?
+    var mappedSkills: [String]?
+    var isDailyTask: Bool?
+    var isRequiredDailyTask: Bool?
+    var dailyDateKey: String?
+    var completedAt: String?
+    var deletedAt: String?
+    var clientUpdatedAt: String?
+    var createdAt: String?
+    var updatedAt: String?
+
+    func toTaskItem() -> TaskItem? {
+        guard let id, let uuid = UUID(uuidString: id) else { return nil }
+
+        let resolvedStatus = TaskStatus(rawValue: status ?? TaskStatus.backlog.rawValue) ?? .backlog
+        let resolvedDifficulty = TaskDifficulty(rawValue: difficulty ?? TaskDifficulty.medium.rawValue) ?? .medium
+        let resolvedPriority = TaskPriority(rawValue: priority ?? TaskPriority.medium.rawValue) ?? .medium
+        let resolvedSkills = (mappedSkills ?? []).compactMap(TaskSkillTag.init(rawValue:))
+        let created = createdAt.flatMap { BackendDateFormatter.date(from: $0) } ?? Date()
+        let updated = clientUpdatedAt.flatMap { BackendDateFormatter.date(from: $0) }
+            ?? updatedAt.flatMap { BackendDateFormatter.date(from: $0) }
+            ?? created
+
+        return TaskItem(
+            id: uuid,
+            title: title ?? "",
+            dueDate: dueAt.flatMap { BackendDateFormatter.date(from: $0) },
+            tags: tags ?? [],
+            status: resolvedStatus,
+            difficulty: resolvedDifficulty,
+            priority: resolvedPriority,
+            mappedSkills: resolvedSkills.isEmpty ? [.execution] : resolvedSkills,
+            isDailyTask: isDailyTask ?? false,
+            isRequiredDailyTask: isRequiredDailyTask ?? false,
+            dailyDateKey: dailyDateKey,
+            createdAt: created,
+            updatedAt: updated,
+            completedAt: completedAt.flatMap { BackendDateFormatter.date(from: $0) }
+        )
+    }
+}
+
+private enum BackendDateFormatter {
+    static let shared: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    static let fallback: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    static func date(from value: String) -> Date? {
+        shared.date(from: value) ?? fallback.date(from: value)
+    }
+}
+
+private struct EmptyBody: Codable {}
+
+private extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        var result: [[Element]] = []
+        var index = startIndex
+        while index < endIndex {
+            let end = self.index(index, offsetBy: size, limitedBy: endIndex) ?? endIndex
+            result.append(Array(self[index..<end]))
+            index = end
+        }
+        return result
     }
 }

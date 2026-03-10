@@ -11,11 +11,15 @@
 Each mutation includes:
 
 - `clientMutationId`
-- `deviceId` (request-level)
+- `clientDeviceId` (request-level, stable client identifier)
 - `timestamp`
 - `entityType`
 - `operation`
 - `payload`
+
+Backward compatibility:
+
+- `deviceId` is accepted as a deprecated alias for `clientDeviceId`.
 
 ## Idempotency
 
@@ -49,4 +53,4 @@ Response:
 
 - Last-write-wins using `client_updated_at`
 - If incoming mutation is older than stored record, mutation is ignored and returned as such
-
+- Task deletion is only accepted via `operation=delete` (not via `status=deleted` in upsert payload)
