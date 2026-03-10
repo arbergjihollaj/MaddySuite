@@ -325,7 +325,7 @@ struct TaskEditorSheet: View {
         case .create:
             return "Create a task with clear priority and due date"
         case .edit:
-            return "Adjust details, archive by marking done, or delete"
+            return "Adjust details, mark as done, archive separately, or delete"
         }
     }
 }

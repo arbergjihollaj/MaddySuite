@@ -38,9 +38,17 @@ struct HabitsView: View {
             }
 
             Section {
-                ForEach(habitsStore.habits) { habit in
+                ForEach(sortedHabits) { habit in
                     let isCompletedToday = isHabitCompletedToday(habit)
-                    HabitRowView(habit: habit, accent: settings.accentColor, isCompletedToday: isCompletedToday) {
+                    let isScheduledToday = habitsStore.isScheduledToday(habit)
+                    let nextScheduledDate = habitsStore.nextScheduledDate(for: habit)
+                    HabitRowView(
+                        habit: habit,
+                        accent: settings.accentColor,
+                        isCompletedToday: isCompletedToday,
+                        isScheduledToday: isScheduledToday,
+                        nextScheduledDate: nextScheduledDate
+                    ) {
                         habitsStore.markCompleted(id: habit.id)
                     } onEdit: {
                         editorHabit = habit
@@ -99,6 +107,17 @@ struct HabitsView: View {
         let key = HabitStore.dayKey(now)
         return (habit.history[key] ?? 0) >= habit.targetValue
     }
+
+    private var sortedHabits: [Habit] {
+        habitsStore.habits.sorted { lhs, rhs in
+            let lhsScheduled = habitsStore.isScheduledToday(lhs)
+            let rhsScheduled = habitsStore.isScheduledToday(rhs)
+            if lhsScheduled != rhsScheduled {
+                return lhsScheduled && rhsScheduled == false
+            }
+            return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+        }
+    }
 }
 
 // =====================================================
@@ -110,6 +129,8 @@ private struct HabitRowView: View {
     let habit: Habit
     let accent: Color
     let isCompletedToday: Bool
+    let isScheduledToday: Bool
+    let nextScheduledDate: Date?
     let onComplete: () -> Void
     let onEdit: () -> Void
 
@@ -135,18 +156,31 @@ private struct HabitRowView: View {
                         .scaleEffect(pulse ? 1.22 : 1.0)
                 }
                 .buttonStyle(.plain)
+                .frame(minWidth: 44, minHeight: 44)
+                .accessibilityLabel(isCompletedToday ? "Habit completed" : "Complete habit")
+                .accessibilityHint(isScheduledToday ? "Marks this habit complete for today" : "Completes habit although it is not scheduled today")
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(habit.title)
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .font(.headline)
                         .foregroundStyle(AppTheme.textPrimary)
 
-                    Text(isCompletedToday ? "Completed today  •  Streak: \(habit.streak)" : "Streak: \(habit.streak)  •  Target: \(habit.targetValue)")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                    Text(scheduleSubtitle)
+                        .font(.subheadline)
                         .foregroundStyle(AppTheme.textSecondary)
                 }
 
                 Spacer()
+
+                Text(isScheduledToday ? "Today" : "Later")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill((isScheduledToday ? accent : Color.white).opacity(0.18))
+                    )
+                    .foregroundStyle(AppTheme.textSecondary)
 
                 Button {
                     onEdit()
@@ -155,7 +189,22 @@ private struct HabitRowView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(AppTheme.textSecondary)
+                .frame(minWidth: 36, minHeight: 36)
+                .accessibilityLabel("Edit habit")
             }
         }
+    }
+
+    private var scheduleSubtitle: String {
+        if isCompletedToday {
+            return "Completed today • Streak: \(habit.streak)"
+        }
+        if isScheduledToday {
+            return "Planned today • Target: \(habit.targetValue)"
+        }
+        if let nextScheduledDate {
+            return "Not planned today • Next: \(nextScheduledDate.formatted(date: .abbreviated, time: .omitted))"
+        }
+        return "Not planned today"
     }
 }

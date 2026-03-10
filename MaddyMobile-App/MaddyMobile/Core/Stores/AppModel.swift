@@ -500,7 +500,7 @@ final class AppModel: ObservableObject {
                 continue
             }
 
-            if task.status == .done || task.status == .missed {
+            if task.status == .missed {
                 if let index = activeByID[id] {
                     active.remove(at: index)
                     activeByID = Dictionary(uniqueKeysWithValues: active.enumerated().map { ($0.element.id, $0.offset) })
@@ -517,7 +517,19 @@ final class AppModel: ObservableObject {
                 }
                 archivedByTaskID = Dictionary(uniqueKeysWithValues: archived.enumerated().map { ($0.element.task.id, $0.offset) })
             } else {
-                if let index = archivedByTaskID[id] {
+                if task.status == .done,
+                   let archivedIndex = archivedByTaskID[id],
+                   activeByID[id] == nil {
+                    let existing = archived[archivedIndex]
+                    archived[archivedIndex] = ArchivedTaskItem(
+                        id: existing.id,
+                        task: task,
+                        archivedAt: existing.archivedAt
+                    )
+                    continue
+                }
+
+                if task.status != .done, let index = archivedByTaskID[id] {
                     archived.remove(at: index)
                     archivedByTaskID = Dictionary(uniqueKeysWithValues: archived.enumerated().map { ($0.element.task.id, $0.offset) })
                 }

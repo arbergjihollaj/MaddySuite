@@ -57,6 +57,17 @@ final class TasksStore: ObservableObject {
         tasks.filter { $0.status != .done && $0.status != .missed }.count
     }
 
+    var doneCount: Int {
+        var ids = Set<UUID>()
+        for task in tasks where task.status == .done {
+            ids.insert(task.id)
+        }
+        for task in archivedTasks.map(\.task) where task.status == .done {
+            ids.insert(task.id)
+        }
+        return ids.count
+    }
+
     func tasks(for status: TaskStatus) -> [TaskItem] {
         tasks
             .filter { $0.status == status }
@@ -77,17 +88,37 @@ final class TasksStore: ObservableObject {
 
     func completedDailyTasks(for date: Date = Date()) -> [TaskItem] {
         let dayKey = TaskItem.dayKey(date)
-        return archivedTasks.map(\.task).filter { $0.isDailyTask && $0.effectiveDailyKey == dayKey }
+        var combined: [UUID: TaskItem] = [:]
+        for task in tasks where task.isDailyTask && task.effectiveDailyKey == dayKey && task.status == .done {
+            combined[task.id] = task
+        }
+        for task in archivedTasks.map(\.task) where task.isDailyTask && task.effectiveDailyKey == dayKey && task.status == .done {
+            combined[task.id] = task
+        }
+        return combined.values.sorted { $0.updatedAt > $1.updatedAt }
     }
 
     func completedNormalTasksCount(for date: Date = Date()) -> Int {
         let calendar = Calendar.current
-        return archivedTasks.reduce(into: 0) { partial, entry in
-            guard entry.task.isDailyTask == false else { return }
-            guard let completed = entry.task.completedAt else { return }
+        var seen = Set<UUID>()
+        let activeDone = tasks.reduce(into: 0) { partial, task in
+            guard task.status == .done else { return }
+            guard task.isDailyTask == false else { return }
+            guard let completed = task.completedAt else { return }
             guard calendar.isDate(completed, inSameDayAs: date) else { return }
+            guard seen.insert(task.id).inserted else { return }
             partial += 1
         }
+        let archivedDone = archivedTasks.reduce(into: 0) { partial, entry in
+            let task = entry.task
+            guard task.status == .done else { return }
+            guard task.isDailyTask == false else { return }
+            guard let completed = task.completedAt else { return }
+            guard calendar.isDate(completed, inSameDayAs: date) else { return }
+            guard seen.insert(task.id).inserted else { return }
+            partial += 1
+        }
+        return activeDone + archivedDone
     }
 
     func upsert(_ task: TaskItem) {
@@ -97,10 +128,11 @@ final class TasksStore: ObservableObject {
         if next.isDailyTask, next.dailyDateKey == nil {
             next.dailyDateKey = TaskItem.dayKey(Date())
         }
-
+        let previous = tasks.first(where: { $0.id == next.id })
         if next.status == .done {
-            queueArchive(taskID: next.id, fallback: next, triggerRewards: true)
-            return
+            next.completedAt = next.completedAt ?? Date()
+        } else {
+            next.completedAt = nil
         }
 
         if let index = tasks.firstIndex(where: { $0.id == next.id }) {
@@ -110,6 +142,9 @@ final class TasksStore: ObservableObject {
         }
 
         touchLocalMutation()
+        if previous?.status != .done, next.status == .done {
+            onTaskCompleted?(next, completedNormalTasksCount())
+        }
     }
 
     func delete(id: UUID) {
@@ -121,26 +156,53 @@ final class TasksStore: ObservableObject {
     func moveToStatus(taskID: UUID, status: TaskStatus) {
         guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
         var item = tasks[index]
+        let wasDone = item.status == .done
         item.status = status
         item.updatedAt = Date()
-
         if status == .done {
-            queueArchive(taskID: item.id, fallback: item, triggerRewards: true)
+            item.completedAt = item.completedAt ?? Date()
         } else {
-            tasks[index] = item
-            touchLocalMutation()
+            item.completedAt = nil
         }
+        tasks[index] = item
+        touchLocalMutation()
+        if wasDone == false, status == .done {
+            onTaskCompleted?(item, completedNormalTasksCount())
+        }
+    }
+
+    @discardableResult
+    func archive(taskID: UUID) -> ArchivedTaskItem? {
+        guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return nil }
+        var item = tasks.remove(at: index)
+        item.updatedAt = Date()
+
+        if let existingArchiveIndex = archivedTasks.firstIndex(where: { $0.task.id == taskID }) {
+            archivedTasks.remove(at: existingArchiveIndex)
+        }
+
+        let archived = ArchivedTaskItem(id: UUID(), task: item, archivedAt: Date())
+        archivedTasks.insert(archived, at: 0)
+        touchLocalMutation()
+        onTaskArchived?(item)
+        return archived
     }
 
     func restoreArchived(id: UUID) {
         guard let archivedIndex = archivedTasks.firstIndex(where: { $0.id == id }) else { return }
         var item = archivedTasks[archivedIndex].task
-        item.status = .backlog
-        item.completedAt = nil
+        if item.status == .missed {
+            item.status = .backlog
+            item.completedAt = nil
+        }
         item.updatedAt = Date()
 
         archivedTasks.remove(at: archivedIndex)
-        tasks.append(item)
+        if let activeIndex = tasks.firstIndex(where: { $0.id == item.id }) {
+            tasks[activeIndex] = item
+        } else {
+            tasks.append(item)
+        }
         touchLocalMutation()
     }
 
@@ -219,35 +281,6 @@ final class TasksStore: ObservableObject {
         lastModifiedAt = snapshot.modifiedAt
         isApplyingCloudSnapshot = false
         persist()
-    }
-
-    private func queueArchive(taskID: UUID, fallback: TaskItem, triggerRewards: Bool) {
-        // Deferring the destructive remove->archive transition avoids list mutation crashes
-        // when the user marks a task done from active swipe/UI transactions.
-        Task { @MainActor [weak self] in
-            self?.archive(taskID: taskID, fallback: fallback, triggerRewards: triggerRewards)
-        }
-    }
-
-    private func archive(taskID: UUID, fallback: TaskItem, triggerRewards: Bool) {
-        guard archivedTasks.contains(where: { $0.task.id == taskID }) == false else { return }
-
-        var source = tasks.first(where: { $0.id == taskID }) ?? fallback
-        source.status = .done
-        source.completedAt = source.completedAt ?? Date()
-        source.updatedAt = Date()
-
-        tasks.removeAll { $0.id == source.id }
-        archivedTasks.insert(
-            ArchivedTaskItem(id: UUID(), task: source, archivedAt: Date()),
-            at: 0
-        )
-
-        touchLocalMutation()
-        if triggerRewards {
-            onTaskArchived?(source)
-            onTaskCompleted?(source, completedNormalTasksCount())
-        }
     }
 
     private func touchLocalMutation() {

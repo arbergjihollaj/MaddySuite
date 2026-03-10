@@ -986,7 +986,7 @@ final class AppState: ObservableObject {
             task.recurrence = existingRecurrence
             task.order = existingOrder
 
-            if task.status == .done || task.status == .missed {
+            if task.status == .missed {
                 if let index = activeByID[id] {
                     active.remove(at: index)
                     activeByID = Dictionary(uniqueKeysWithValues: active.enumerated().map { ($0.element.id, $0.offset) })
@@ -1006,7 +1006,20 @@ final class AppState: ObservableObject {
                 }
                 archivedByTaskID = Dictionary(uniqueKeysWithValues: archived.enumerated().map { ($0.element.task.id, $0.offset) })
             } else {
-                if let index = archivedByTaskID[id] {
+                if task.status == .done,
+                   let archivedIndex = archivedByTaskID[id],
+                   activeByID[id] == nil {
+                    let existing = archived[archivedIndex]
+                    archived[archivedIndex] = ArchivedTaskItem(
+                        id: existing.id,
+                        task: task,
+                        archivedAt: existing.archivedAt,
+                        sourceStatus: existing.sourceStatus
+                    )
+                    continue
+                }
+
+                if task.status != .done, let index = archivedByTaskID[id] {
                     archived.remove(at: index)
                     archivedByTaskID = Dictionary(uniqueKeysWithValues: archived.enumerated().map { ($0.element.task.id, $0.offset) })
                 }
@@ -1191,8 +1204,13 @@ final class AppState: ObservableObject {
             return true
         case .habits:
             guard let decoded = try? decoder.decode(CloudHabitsPayload.self, from: payload) else { return false }
-            habitsViewModel.habits = decoded.habits
-            storage.save(decoded.habits, to: .habits)
+            let normalized = decoded.habits.map { habit -> HabitItem in
+                var copy = habit
+                copy.scheduledWeekdays = HabitItem.normalizedWeekdays(copy.scheduledWeekdays)
+                return copy
+            }
+            habitsViewModel.habits = normalized
+            storage.save(normalized, to: .habits)
             return true
         case .focus:
             guard let decoded = try? decoder.decode(CloudFocusPayload.self, from: payload) else { return false }

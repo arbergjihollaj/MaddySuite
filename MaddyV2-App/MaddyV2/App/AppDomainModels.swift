@@ -383,7 +383,47 @@ struct HabitItem: Identifiable, Codable, Equatable {
     var scheduledWeekdays: [Int]
     var history: [String: Int]
 
-    static let weekdaySymbols = ["S", "M", "T", "W", "T", "F", "S"]
+    static func normalizedWeekdays(_ values: [Int]) -> [Int] {
+        let normalized = Set(values.map { value -> Int in
+            switch value {
+            case 8:
+                return 1 // Legacy Sunday encoding.
+            case 1...7:
+                return value
+            default:
+                return 1
+            }
+        })
+        if normalized.isEmpty {
+            return [2, 3, 4, 5, 6]
+        }
+        return normalized.sorted()
+    }
+
+    static func weekdayLabels(mondayFirst: Bool, calendar: Calendar = .current) -> [(value: Int, label: String)] {
+        let symbols = calendar.veryShortWeekdaySymbols
+        let orderedValues = mondayFirst ? [2, 3, 4, 5, 6, 7, 1] : [1, 2, 3, 4, 5, 6, 7]
+        return orderedValues.map { day in
+            (value: day, label: symbols[day - 1])
+        }
+    }
+
+    func isScheduled(on date: Date, calendar: Calendar = .current) -> Bool {
+        let plannedDays = Self.normalizedWeekdays(scheduledWeekdays)
+        let weekday = calendar.component(.weekday, from: date)
+        return plannedDays.contains(weekday)
+    }
+
+    func nextScheduledDate(after date: Date = Date(), calendar: Calendar = .current) -> Date? {
+        let start = calendar.startOfDay(for: date)
+        for offset in 0..<15 {
+            guard let candidate = calendar.date(byAdding: .day, value: offset, to: start) else { continue }
+            if isScheduled(on: candidate, calendar: calendar) {
+                return candidate
+            }
+        }
+        return nil
+    }
 
     static func makeEmpty() -> HabitItem {
         HabitItem(
@@ -691,10 +731,6 @@ final class TasksViewModel: ObservableObject {
         self.archivedTasks = archivedTasks
         self.persist = persist
         self.draft = TaskItem.makeEmpty(defaultPriority: .medium)
-
-        if migrateDoneTasksIntoArchive() {
-            persistAll()
-        }
     }
 
     func resetDraft(defaultPriority: TaskPriority) {
@@ -748,18 +784,14 @@ final class TasksViewModel: ObservableObject {
         }
 
         if task.status == .done {
-            if previousStatus != .done {
-                task.completedAt = task.completedAt ?? Date()
-                spawnRecurringTaskIfNeeded(from: task)
-                onTaskCompleted?(task)
-            }
-            archive(task, sourceStatus: previousStatus ?? .backlog, announce: true)
-            if let previousStatus, previousStatus != .done {
-                normalizeOrders(for: previousStatus)
-            }
-            persistAll()
-            resetDraft(defaultPriority: defaultPriority)
-            return true
+            task.completedAt = task.completedAt ?? Date()
+        } else {
+            task.completedAt = nil
+        }
+
+        if previousStatus != .done, task.status == .done {
+            spawnRecurringTaskIfNeeded(from: task)
+            onTaskCompleted?(task)
         }
 
         if let previousStatus, previousStatus != task.status, previousStatus != .done {
@@ -818,21 +850,41 @@ final class TasksViewModel: ObservableObject {
 
     func completedDailyTasks(for date: Date = Date()) -> [TaskItem] {
         let dayKey = TaskItem.dayKey(date)
-        return archivedTasks.map(\.task).filter {
-            $0.isDailyTask &&
-            $0.effectiveDailyKey == dayKey &&
-            $0.status == .done
+        var combined: [UUID: TaskItem] = [:]
+        for task in tasks where
+            task.isDailyTask &&
+            task.effectiveDailyKey == dayKey &&
+            task.status == .done {
+            combined[task.id] = task
         }
+        for task in archivedTasks.map(\.task) where
+            task.isDailyTask &&
+            task.effectiveDailyKey == dayKey &&
+            task.status == .done {
+            combined[task.id] = task
+        }
+        return combined.values.sorted { $0.updatedAt > $1.updatedAt }
     }
 
     func completedNormalTasksCount(for date: Date = Date()) -> Int {
         let calendar = Calendar.current
-        return archivedTasks.reduce(into: 0) { partial, archived in
+        var seen = Set<UUID>()
+        let activeDone = tasks.reduce(into: 0) { partial, task in
+            guard task.status == .done else { return }
+            guard task.isDailyTask == false else { return }
+            guard let completedAt = task.completedAt else { return }
+            guard calendar.isDate(completedAt, inSameDayAs: date) else { return }
+            guard seen.insert(task.id).inserted else { return }
+            partial += 1
+        }
+        let archivedDone = archivedTasks.reduce(into: 0) { partial, archived in
             guard archived.task.isDailyTask == false else { return }
             guard let completedAt = archived.task.completedAt else { return }
             guard calendar.isDate(completedAt, inSameDayAs: date) else { return }
+            guard seen.insert(archived.task.id).inserted else { return }
             partial += 1
         }
+        return activeDone + archivedDone
     }
 
     func delete(taskID: UUID) {
@@ -859,14 +911,18 @@ final class TasksViewModel: ObservableObject {
         let entry = archivedTasks.remove(at: index)
         var restored = entry.task
 
-        let restoredStatus: TaskStatus = entry.sourceStatus == .done ? .backlog : entry.sourceStatus
+        let restoredStatus: TaskStatus = entry.sourceStatus == .missed ? .backlog : entry.task.status
         restored.status = restoredStatus
         if restoredStatus != .done {
             restored.completedAt = nil
         }
         restored.order = nextOrder(in: restoredStatus)
 
-        tasks.append(restored)
+        if let existing = tasks.firstIndex(where: { $0.id == restored.id }) {
+            tasks[existing] = restored
+        } else {
+            tasks.append(restored)
+        }
         normalizeOrders(for: restoredStatus)
         persistAll()
     }
@@ -875,34 +931,44 @@ final class TasksViewModel: ObservableObject {
         restoreArchived(archiveID: archiveID)
     }
 
+    func archive(taskID: UUID) {
+        guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
+        var archivedTask = tasks.remove(at: index)
+        let sourceStatus = archivedTask.status
+        archivedTask.updatedAt = Date()
+
+        if let existing = archivedTasks.firstIndex(where: { $0.task.id == archivedTask.id }) {
+            archivedTasks.remove(at: existing)
+        }
+
+        let archived = ArchivedTaskItem(
+            id: UUID(),
+            task: archivedTask,
+            archivedAt: Date(),
+            sourceStatus: sourceStatus
+        )
+        archivedTasks.insert(archived, at: 0)
+        normalizeOrders(for: sourceStatus)
+        latestArchiveNotice = ArchiveNotice(archiveID: archived.id, title: archivedTask.title)
+        persistAll()
+    }
+
     func moveTask(_ taskID: UUID, to newStatus: TaskStatus, before beforeID: UUID?) {
         guard let movingIndex = tasks.firstIndex(where: { $0.id == taskID }) else { return }
 
         let previousStatus = tasks[movingIndex].status
 
-        if newStatus == .done {
-            var completed = tasks[movingIndex]
-            completed.status = .done
-            completed.completedAt = completed.completedAt ?? Date()
-
-            if previousStatus != .done {
-                spawnRecurringTaskIfNeeded(from: completed)
-                onTaskCompleted?(completed)
-            }
-
-            archive(completed, sourceStatus: previousStatus, announce: true)
-            if previousStatus != .done {
-                normalizeOrders(for: previousStatus)
-            }
-            persistAll()
-            return
-        }
-
         var moving = tasks[movingIndex]
         moving.status = newStatus
         moving.updatedAt = Date()
 
-        if newStatus != .done {
+        if newStatus == .done {
+            moving.completedAt = moving.completedAt ?? Date()
+            if previousStatus != .done {
+                spawnRecurringTaskIfNeeded(from: moving)
+                onTaskCompleted?(moving)
+            }
+        } else {
             moving.completedAt = nil
         }
 
@@ -1047,44 +1113,6 @@ final class TasksViewModel: ObservableObject {
         normalizeOrders(for: .backlog)
     }
 
-    private func migrateDoneTasksIntoArchive() -> Bool {
-        let finished = tasks.filter { $0.status == .done }
-        guard finished.isEmpty == false else { return false }
-
-        for task in finished {
-            archive(task, sourceStatus: .backlog, announce: false)
-        }
-        normalizeOrders(for: .backlog)
-        normalizeOrders(for: .inProgress)
-        return true
-    }
-
-    // =====================================================
-    // MARK: - Done Auto Remove / Archive
-    // [TAG: TASK_DONE_AUTO_REMOVE]
-    // =====================================================
-
-    private func archive(_ task: TaskItem, sourceStatus: TaskStatus, announce: Bool) {
-        var archivedTask = task
-        archivedTask.status = .done
-        archivedTask.completedAt = archivedTask.completedAt ?? Date()
-        archivedTask.updatedAt = Date()
-
-        tasks.removeAll { $0.id == archivedTask.id }
-
-        let archived = ArchivedTaskItem(
-            id: UUID(),
-            task: archivedTask,
-            archivedAt: Date(),
-            sourceStatus: sourceStatus
-        )
-        archivedTasks.insert(archived, at: 0)
-
-        if announce {
-            latestArchiveNotice = ArchiveNotice(archiveID: archived.id, title: archivedTask.title)
-        }
-    }
-
     private func persistAll() {
         persist(tasks, archivedTasks)
     }
@@ -1146,7 +1174,7 @@ final class HabitsViewModel: ObservableObject {
     private let persist: ([HabitItem]) -> Void
 
     init(habits: [HabitItem], persist: @escaping ([HabitItem]) -> Void) {
-        self.habits = habits
+        self.habits = habits.map(Self.normalized)
         self.persist = persist
     }
 
@@ -1158,6 +1186,7 @@ final class HabitsViewModel: ObservableObject {
         let cleanTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard cleanTitle.isEmpty == false else { return }
         draft.title = cleanTitle
+        draft.scheduledWeekdays = HabitItem.normalizedWeekdays(draft.scheduledWeekdays)
 
         if let index = habits.firstIndex(where: { $0.id == draft.id }) {
             habits[index] = draft
@@ -1193,11 +1222,28 @@ final class HabitsViewModel: ObservableObject {
         valueToday(for: habit) >= habit.targetPerDay
     }
 
+    func isScheduledToday(_ habit: HabitItem, now: Date = Date()) -> Bool {
+        habit.isScheduled(on: now)
+    }
+
+    func nextScheduledDate(for habit: HabitItem, after date: Date = Date()) -> Date? {
+        habit.nextScheduledDate(after: date)
+    }
+
     func currentStreak(for habit: HabitItem) -> Int {
         var streak = 0
         var day = Calendar.current.startOfDay(for: Date())
+        var inspectedDays = 0
 
-        while true {
+        while inspectedDays < 365 {
+            inspectedDays += 1
+            if habit.isScheduled(on: day) == false {
+                guard let previous = Calendar.current.date(byAdding: .day, value: -1, to: day) else {
+                    break
+                }
+                day = previous
+                continue
+            }
             let key = day.yyyymmdd
             let value = habit.history[key, default: 0]
             if value >= habit.targetPerDay {
@@ -1216,17 +1262,20 @@ final class HabitsViewModel: ObservableObject {
 
     func weeklyScore(for habit: HabitItem) -> Double {
         let days = Date.last7Days
-        let completed = days.filter { day in
+        let scheduled = days.filter { habit.isScheduled(on: $0) }
+        guard scheduled.isEmpty == false else { return 0 }
+        let completed = scheduled.filter { day in
             habit.history[day.yyyymmdd, default: 0] >= habit.targetPerDay
         }.count
 
-        return Double(completed) / 7.0
+        return Double(completed) / Double(scheduled.count)
     }
 
     func weeklyCompletionCount() -> Int {
         habits.reduce(0) { total, habit in
-            total + Date.last7Days.filter {
-                habit.history[$0.yyyymmdd, default: 0] >= habit.targetPerDay
+            total + Date.last7Days.filter { day in
+                habit.isScheduled(on: day) &&
+                habit.history[day.yyyymmdd, default: 0] >= habit.targetPerDay
             }.count
         }
     }
@@ -1242,6 +1291,12 @@ final class HabitsViewModel: ObservableObject {
         return stride(from: 0, to: aggregate.count, by: 7).map { start in
             Array(aggregate[start..<min(start + 7, aggregate.count)])
         }
+    }
+
+    private static func normalized(_ habit: HabitItem) -> HabitItem {
+        var copy = habit
+        copy.scheduledWeekdays = HabitItem.normalizedWeekdays(copy.scheduledWeekdays)
+        return copy
     }
 }
 

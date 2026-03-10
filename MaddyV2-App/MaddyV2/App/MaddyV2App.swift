@@ -31,6 +31,21 @@ struct MaddyV2App: App {
                 .preferredColorScheme(.dark)
         }
         .defaultSize(width: 1240, height: 820)
+        .commands {
+            CommandMenu("Navigate") {
+                navigationCommand("Home", route: .home, key: "1")
+                navigationCommand("Tasks", route: .tasks, key: "2")
+                navigationCommand("Habits", route: .habits, key: "3")
+                navigationCommand("Focus", route: .focus, key: "4")
+                navigationCommand("Calendar", route: .calendar, key: "5")
+                navigationCommand("Coach", route: .ai, key: "6")
+                Divider()
+                Button("Settings") {
+                    appState.navigate(to: .settings)
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
 
         Window("File Shelf", id: FileShelfWindowID.panel) {
             FileShelfPanelView()
@@ -69,6 +84,13 @@ struct MaddyV2App: App {
                 .environmentObject(fileShelfStore)
                 .frame(width: 900, height: 680)
         }
+    }
+
+    private func navigationCommand(_ title: String, route: AppRoute, key: KeyEquivalent) -> some View {
+        Button(title) {
+            appState.navigate(to: route)
+        }
+        .keyboardShortcut(key, modifiers: .command)
     }
 }
 

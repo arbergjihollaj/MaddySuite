@@ -34,11 +34,11 @@ final class HabitStore: ObservableObject {
         self.storage = storage
 
         if let loaded = storage.loadIfPresent(Persisted.self, from: fileName) {
-            habits = loaded.habits
+            habits = loaded.habits.map(Self.normalized)
             lastModifiedAt = loaded.lastModifiedAt ?? Self.deriveModifiedAt(from: loaded.habits)
         } else {
             let legacy = storage.load([Habit].self, from: fileName, fallback: [])
-            habits = legacy
+            habits = legacy.map(Self.normalized)
             lastModifiedAt = Self.deriveModifiedAt(from: legacy)
         }
 
@@ -46,19 +46,28 @@ final class HabitStore: ObservableObject {
     }
 
     var todayProgressText: String {
-        "\(completedTodayCount)/\(habits.count)"
+        let planned = scheduledTodayCount
+        guard planned > 0 else { return "No habits planned" }
+        return "\(completedTodayCount)/\(planned)"
+    }
+
+    var scheduledTodayCount: Int {
+        habits.filter { isScheduledToday($0) }.count
     }
 
     var completedTodayCount: Int {
         let key = Self.dayKey(Date())
-        return habits.filter { ($0.history[key] ?? 0) >= $0.targetValue }.count
+        return habits.filter { habit in
+            isScheduledToday(habit) && (habit.history[key] ?? 0) >= habit.targetValue
+        }.count
     }
 
     func upsert(_ habit: Habit) {
+        let normalizedHabit = Self.normalized(habit)
         if let index = habits.firstIndex(where: { $0.id == habit.id }) {
-            habits[index] = habit
+            habits[index] = normalizedHabit
         } else {
-            habits.append(habit)
+            habits.append(normalizedHabit)
         }
         touchLocalMutation()
     }
@@ -68,10 +77,14 @@ final class HabitStore: ObservableObject {
         touchLocalMutation()
     }
 
-    func markCompleted(id: UUID, date: Date = Date()) {
+    func markCompleted(id: UUID, date: Date = Date(), allowOffSchedule: Bool = true) {
         guard let index = habits.firstIndex(where: { $0.id == id }) else { return }
         var habit = habits[index]
         let key = Self.dayKey(date)
+
+        if allowOffSchedule == false, HabitSchedule.isScheduled(habit, on: date) == false {
+            return
+        }
 
         let alreadyComplete = (habit.history[key] ?? 0) >= habit.targetValue
         if alreadyComplete {
@@ -96,6 +109,10 @@ final class HabitStore: ObservableObject {
 
         var changed = false
         for index in habits.indices {
+            let scheduledYesterday = HabitSchedule.isScheduled(habits[index], on: yesterday)
+            if scheduledYesterday == false {
+                continue
+            }
             let completedYesterday = (habits[index].history[yesterdayKey] ?? 0) >= habits[index].targetValue
             if completedYesterday == false, habits[index].streak > 0 {
                 habits[index].streak = 0
@@ -122,6 +139,14 @@ final class HabitStore: ObservableObject {
         return map
     }
 
+    func isScheduledToday(_ habit: Habit, now: Date = Date()) -> Bool {
+        HabitSchedule.isScheduled(habit, on: now)
+    }
+
+    func nextScheduledDate(for habit: Habit, after date: Date = Date()) -> Date? {
+        HabitSchedule.nextScheduledDate(for: habit, after: date)
+    }
+
     func cloudSnapshot() -> CloudSnapshot {
         CloudSnapshot(habits: habits, modifiedAt: lastModifiedAt)
     }
@@ -130,7 +155,7 @@ final class HabitStore: ObservableObject {
         guard snapshot.modifiedAt > lastModifiedAt else { return }
 
         isApplyingCloudSnapshot = true
-        habits = snapshot.habits
+        habits = snapshot.habits.map(Self.normalized)
         lastModifiedAt = snapshot.modifiedAt
         isApplyingCloudSnapshot = false
         persist()
@@ -168,6 +193,13 @@ final class HabitStore: ObservableObject {
             .flatMap { $0.history.keys }
             .compactMap(Self.dayDate)
             .max() ?? .distantPast
+    }
+
+    private static func normalized(_ habit: Habit) -> Habit {
+        var copy = habit
+        copy.weekdays = HabitSchedule.normalizedWeekdays(copy.weekdays)
+        copy.everyXDays = max(1, copy.everyXDays)
+        return copy
     }
 
     static func dayKey(_ date: Date) -> String {
